@@ -109,6 +109,15 @@ app.post('/api/blocks', (req, res) => {
   res.json(block)
 })
 
+app.put('/api/blocks/:id', (req, res) => {
+  const blocks = readJSON('blocks')
+  const idx = blocks.findIndex(b => b.id === req.params.id)
+  if (idx === -1) return res.status(404).json({ error: 'not_found' })
+  blocks[idx] = { ...blocks[idx], ...req.body }
+  writeJSON('blocks', blocks)
+  res.json(blocks[idx])
+})
+
 app.delete('/api/blocks/:id', (req, res) => {
   writeJSON('blocks', readJSON('blocks').filter(b => b.id !== req.params.id))
   res.json({ ok: true })

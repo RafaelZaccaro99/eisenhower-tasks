@@ -101,6 +101,14 @@ ipcMain.handle('agenda:create', (_, block) => {
   return block
 })
 
+ipcMain.handle('agenda:update', (_, block) => {
+  const db = readDb()
+  const idx = db.blocks.findIndex(b => b.id === block.id)
+  if (idx !== -1) db.blocks[idx] = { ...db.blocks[idx], ...block }
+  writeDb(db)
+  return db.blocks[idx]
+})
+
 ipcMain.handle('agenda:delete', (_, id) => {
   const db = readDb()
   db.blocks = db.blocks.filter(b => b.id !== id)

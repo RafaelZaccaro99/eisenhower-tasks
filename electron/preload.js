@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
     getByDate: (date) => ipcRenderer.invoke('agenda:getByDate', date),
     getRange: (range) => ipcRenderer.invoke('agenda:getRange', range),
     create: (block) => ipcRenderer.invoke('agenda:create', block),
+    update: (block) => ipcRenderer.invoke('agenda:update', block),
     delete: (id) => ipcRenderer.invoke('agenda:delete', id),
   },
   people: {
