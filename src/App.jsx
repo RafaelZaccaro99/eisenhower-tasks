@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
-import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
 import People from './components/People'
 import Settings from './components/Settings'
+import History from './components/History'
 import TaskModal from './components/TaskModal'
 import Onboarding from './components/Onboarding'
 import { useTasks } from './hooks/useTasks'
@@ -12,9 +13,10 @@ import { useSettings } from './hooks/useSettings'
 
 const VIEWS = [
   { key: 'matrix',   label: 'Matriz',        icon: LayoutGrid   },
-  { key: 'agenda',   label: 'Agenda',         icon: CalendarDays },
-  { key: 'people',   label: 'Pessoas',        icon: Users        },
-  { key: 'settings', label: 'Configurações',  icon: SettingsIcon },
+  { key: 'agenda',   label: 'Agenda',        icon: CalendarDays },
+  { key: 'people',   label: 'Pessoas',       icon: Users        },
+  { key: 'history',  label: 'Histórico',     icon: Clock        },
+  { key: 'settings', label: 'Configurações', icon: SettingsIcon },
 ]
 
 export default function App() {
@@ -25,7 +27,37 @@ export default function App() {
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis, toggleAssistant } = useSettings()
 
-  // Show onboarding if not completed
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKey(e) {
+      // Don't fire while typing in an input/textarea or while a modal is open
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (modal) return
+
+      // Ctrl+K / Cmd+K → focus search in matrix
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        if (view !== 'matrix') setView('matrix')
+        setTimeout(() => window.__matrixFocusSearch?.(), 50)
+        return
+      }
+
+      switch (e.key) {
+        case 'n': case 'N':
+          if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); openNew('q2') }
+          break
+        case '1': setView('matrix');   break
+        case '2': setView('agenda');   break
+        case '3': setView('people');   break
+        case '4': setView('history');  break
+        case '5': setView('settings'); break
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [modal, view])
+
   if (!settings.onboardingCompleted) {
     return <Onboarding onComplete={data => saveAnamnesis(data)} />
   }
@@ -47,6 +79,7 @@ export default function App() {
   }
 
   const pending = tasks.filter(t => t.status !== 'completed').length
+  const showNewButton = view !== 'people' && view !== 'settings' && view !== 'history'
 
   return (
     <div className="h-screen flex flex-col bg-white overflow-hidden">
@@ -85,7 +118,7 @@ export default function App() {
           })}
         </nav>
 
-        {view !== 'people' && view !== 'settings' ? (
+        {showNewButton ? (
           <button onClick={() => openNew('q2')} className="btn-primary">
             <Plus size={14} /> Nova tarefa
           </button>
@@ -99,8 +132,14 @@ export default function App() {
         {loading ? (
           <div className="h-full flex items-center justify-center text-notion-muted text-sm">Carregando...</div>
         ) : view === 'matrix' ? (
-          <Matrix tasks={tasks} people={people} onNew={openNew}
-            onEdit={task => setModal({ task })} onDelete={deleteTask} onToggle={toggleStatus} />
+          <Matrix
+            tasks={tasks} people={people}
+            onNew={openNew}
+            onEdit={task => setModal({ task })}
+            onDelete={deleteTask}
+            onToggle={toggleStatus}
+            onMoveTask={updateTask}
+          />
         ) : view === 'agenda' ? (
           <Agenda tasks={tasks} />
         ) : view === 'people' ? (
@@ -111,6 +150,12 @@ export default function App() {
             onCreate={createPerson}
             onUpdate={updatePerson}
             onDelete={deletePerson}
+          />
+        ) : view === 'history' ? (
+          <History
+            tasks={tasks}
+            onDelete={deleteTask}
+            onToggle={toggleStatus}
           />
         ) : (
           <Settings

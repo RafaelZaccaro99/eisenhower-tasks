@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Lock, Repeat } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, X, Lock, Repeat, Pencil } from 'lucide-react'
 import { format, addDays, startOfWeek, isSameDay, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { v4 as uuidv4 } from 'uuid'
@@ -16,7 +16,6 @@ const RECURRENCE_LABELS = {
   monthly: 'Mensalmente',
 }
 
-// Checks if a recurring block applies to the given date
 function recurrenceMatchesDate(block, dateStr) {
   if (!block.recurrence || block.recurrence === 'none') return block.date === dateStr
   const origin = parseISO(block.date)
@@ -24,19 +23,17 @@ function recurrenceMatchesDate(block, dateStr) {
   if (target < origin) return false
   if (block.recurrence_end && dateStr > block.recurrence_end) return false
   if (block.recurrence === 'daily') return true
-  if (block.recurrence === 'weekly') {
-    return origin.getDay() === target.getDay()
-  }
-  if (block.recurrence === 'monthly') {
-    return origin.getDate() === target.getDate()
-  }
+  if (block.recurrence === 'weekly') return origin.getDay() === target.getDay()
+  if (block.recurrence === 'monthly') return origin.getDate() === target.getDate()
   return false
 }
 
-function BlockModal({ date, tasks, onSave, onClose }) {
+function BlockModal({ date, tasks, initialBlock, onSave, onUpdate, onClose }) {
+  const isEdit = !!initialBlock?.id
   const [form, setForm] = useState({
     task_id: '', title: '', start_time: '09:00', end_time: '10:00',
     color: '#60a5fa', locked: false, recurrence: 'none', recurrence_end: '',
+    ...(initialBlock || {}),
   })
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -49,22 +46,32 @@ function BlockModal({ date, tasks, onSave, onClose }) {
     }))
   }
 
+  function handleSubmit(e) {
+    e.preventDefault()
+    if (isEdit) {
+      onUpdate({ ...form })
+    } else {
+      onSave({ id: uuidv4(), ...form, date: format(date, 'yyyy-MM-dd') })
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center"
       style={{ background: 'rgba(15,15,15,0.4)' }} onClick={onClose}>
       <form
-        onSubmit={e => { e.preventDefault(); onSave({ id: uuidv4(), ...form, date: format(date, 'yyyy-MM-dd') }) }}
+        onSubmit={handleSubmit}
         onClick={e => e.stopPropagation()}
         className="bg-white rounded-xl w-full max-w-sm overflow-hidden"
         style={{ boxShadow: '0 8px 40px rgba(15,15,15,0.12), 0 0 0 1px rgba(15,15,15,0.06)' }}
       >
         <div className="px-5 pt-4 pb-3 border-b border-notion-border flex items-center justify-between">
-          <h2 className="text-base font-semibold text-notion-text">Novo bloco</h2>
+          <h2 className="text-base font-semibold text-notion-text">
+            {isEdit ? 'Editar bloco' : 'Novo bloco'}
+          </h2>
           <button type="button" onClick={onClose} className="text-notion-muted hover:text-notion-text"><X size={16} /></button>
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-3">
-          {/* Task link */}
           <div>
             <label className="label">Vincular tarefa</label>
             <select className="input" value={form.task_id} onChange={handleTaskChange}>
@@ -75,14 +82,12 @@ function BlockModal({ date, tasks, onSave, onClose }) {
             </select>
           </div>
 
-          {/* Title */}
           <div>
             <label className="label">Título *</label>
             <input className="input" value={form.title} required
               onChange={e => set('title', e.target.value)} placeholder="Ex: Reunião de equipe" />
           </div>
 
-          {/* Times */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Início</label>
@@ -96,26 +101,36 @@ function BlockModal({ date, tasks, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Recurrence */}
           <div>
-            <label className="label">Recorrência</label>
-            <select className="input" value={form.recurrence} onChange={e => set('recurrence', e.target.value)}>
-              {Object.entries(RECURRENCE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
+            <label className="label">Cor</label>
+            <div className="flex items-center gap-2">
+              <input type="color" className="w-8 h-8 rounded cursor-pointer border border-notion-border"
+                value={form.color} onChange={e => set('color', e.target.value)} />
+              <span className="text-xs text-notion-muted">{form.color}</span>
+            </div>
           </div>
 
-          {/* Recurrence end */}
-          {form.recurrence !== 'none' && (
-            <div>
-              <label className="label">Repetir até (opcional)</label>
-              <input type="date" className="input" value={form.recurrence_end}
-                onChange={e => set('recurrence_end', e.target.value)} />
-            </div>
+          {!isEdit && (
+            <>
+              <div>
+                <label className="label">Recorrência</label>
+                <select className="input" value={form.recurrence} onChange={e => set('recurrence', e.target.value)}>
+                  {Object.entries(RECURRENCE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              {form.recurrence !== 'none' && (
+                <div>
+                  <label className="label">Repetir até (opcional)</label>
+                  <input type="date" className="input" value={form.recurrence_end}
+                    onChange={e => set('recurrence_end', e.target.value)} />
+                </div>
+              )}
+            </>
           )}
 
-          {/* Locked toggle */}
           <button
             type="button"
             onClick={() => set('locked', !form.locked)}
@@ -135,14 +150,16 @@ function BlockModal({ date, tasks, onSave, onClose }) {
 
         <div className="px-5 py-3 border-t border-notion-border bg-notion-surface flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="btn-ghost">Cancelar</button>
-          <button type="submit" className="btn-primary">Adicionar</button>
+          <button type="submit" className="btn-primary">
+            {isEdit ? 'Salvar' : 'Adicionar'}
+          </button>
         </div>
       </form>
     </div>
   )
 }
 
-function TimeGrid({ blocks, onDeleteBlock }) {
+function TimeGrid({ blocks, onDeleteBlock, onEditBlock }) {
   return (
     <div className="relative overflow-y-auto flex-1">
       {HOURS.map(h => (
@@ -161,8 +178,9 @@ function TimeGrid({ blocks, onDeleteBlock }) {
         return (
           <div
             key={block.id + block.date}
-            className="absolute left-16 right-3 rounded-md px-2.5 py-1 text-white text-xs overflow-hidden group"
+            className="absolute left-16 right-3 rounded-md px-2.5 py-1 text-white text-xs overflow-hidden group cursor-pointer"
             style={{ top, height, backgroundColor: block.color || '#60a5fa', opacity: block.locked ? 1 : 0.9 }}
+            onClick={() => onEditBlock(block)}
           >
             <div className="flex items-center gap-1">
               {block.locked && <Lock size={9} className="flex-shrink-0 opacity-80" />}
@@ -170,16 +188,24 @@ function TimeGrid({ blocks, onDeleteBlock }) {
               <p className="font-medium truncate leading-tight flex-1">{block.title}</p>
             </div>
             <p className="opacity-70 text-[11px]">{block.start_time} – {block.end_time}</p>
-            {!block.locked && (
+            <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={() => onDeleteBlock(block.id)}
-                className="absolute top-1 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={e => { e.stopPropagation(); onEditBlock(block) }}
+                className="hover:opacity-80"
               >
-                <X size={11} />
+                <Pencil size={10} />
               </button>
-            )}
+              {!block.locked && (
+                <button
+                  onClick={e => { e.stopPropagation(); onDeleteBlock(block.id) }}
+                  className="hover:opacity-80"
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
             {block.locked && (
-              <span className="absolute top-1 right-1.5 opacity-40 text-[10px]">travado</span>
+              <span className="absolute bottom-0.5 right-1.5 opacity-40 text-[10px]">travado</span>
             )}
           </div>
         )
@@ -192,7 +218,7 @@ export default function Agenda({ tasks }) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [blocks, setBlocks] = useState([])
-  const [showModal, setShowModal] = useState(false)
+  const [modal, setModal] = useState(null) // null | 'new' | block object (for edit)
   const [serverMode, setServerMode] = useState(false)
 
   const ipc = window.api?.agenda
@@ -230,7 +256,22 @@ export default function Agenda({ tasks }) {
       lsWriteBlocks([...lsReadBlocks(), block])
     }
     await loadBlocks(selectedDate)
-    setShowModal(false)
+    setModal(null)
+  }
+
+  async function handleUpdateBlock(block) {
+    if (ipc) {
+      await ipc.update(block)
+    } else if (serverMode) {
+      await dataApi.blocks.update(block.id, block)
+    } else {
+      const all = lsReadBlocks()
+      const idx = all.findIndex(b => b.id === block.id)
+      if (idx !== -1) all[idx] = block
+      lsWriteBlocks(all)
+    }
+    await loadBlocks(selectedDate)
+    setModal(null)
   }
 
   async function handleDeleteBlock(id) {
@@ -289,18 +330,25 @@ export default function Agenda({ tasks }) {
           </h2>
           <p className="text-xs text-notion-muted">{blocks.length} bloco{blocks.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setShowModal(true)} className="btn-ghost">
+        <button onClick={() => setModal('new')} className="btn-ghost">
           <Plus size={13} /> Bloco
         </button>
       </div>
 
       {/* Grid */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <TimeGrid blocks={blocks} onDeleteBlock={handleDeleteBlock} />
+        <TimeGrid blocks={blocks} onDeleteBlock={handleDeleteBlock} onEditBlock={block => setModal(block)} />
       </div>
 
-      {showModal && (
-        <BlockModal date={selectedDate} tasks={tasks} onSave={handleSaveBlock} onClose={() => setShowModal(false)} />
+      {modal && (
+        <BlockModal
+          date={selectedDate}
+          tasks={tasks}
+          initialBlock={modal === 'new' ? null : modal}
+          onSave={handleSaveBlock}
+          onUpdate={handleUpdateBlock}
+          onClose={() => setModal(null)}
+        />
       )}
     </div>
   )
