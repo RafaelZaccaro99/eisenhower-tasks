@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Plus, X, Lock, Repeat } from 'lucide-react'
-import { format, addDays, addWeeks, addMonths, startOfWeek, isSameDay, isToday, parseISO } from 'date-fns'
+import { format, addDays, startOfWeek, isSameDay, isToday, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { v4 as uuidv4 } from 'uuid'
+import { isServerUp, dataApi } from '../utils/dataApi'
 
 const Q_COLORS = { q1: '#f87171', q2: '#60a5fa', q3: '#fbbf24', q4: '#9b9a97' }
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
@@ -192,6 +193,7 @@ export default function Agenda({ tasks }) {
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [blocks, setBlocks] = useState([])
   const [showModal, setShowModal] = useState(false)
+  const [serverMode, setServerMode] = useState(false)
 
   const ipc = window.api?.agenda
 
@@ -204,28 +206,44 @@ export default function Agenda({ tasks }) {
     const dateStr = format(date, 'yyyy-MM-dd')
     if (ipc) {
       setBlocks(await ipc.getByDate(dateStr))
+      return
+    }
+    const up = await isServerUp()
+    setServerMode(up)
+    if (up) {
+      const all = await dataApi.blocks.list()
+      setBlocks(all.filter(b => recurrenceMatchesDate(b, dateStr)))
     } else {
       const all = lsReadBlocks()
-      const matched = all.filter(b => recurrenceMatchesDate(b, dateStr))
-      setBlocks(matched)
+      setBlocks(all.filter(b => recurrenceMatchesDate(b, dateStr)))
     }
   }
 
   useEffect(() => { loadBlocks(selectedDate) }, [selectedDate])
 
   async function handleSaveBlock(block) {
-    if (ipc) await ipc.create(block)
-    else lsWriteBlocks([...lsReadBlocks(), block])
+    if (ipc) {
+      await ipc.create(block)
+    } else if (serverMode) {
+      await dataApi.blocks.create(block)
+    } else {
+      lsWriteBlocks([...lsReadBlocks(), block])
+    }
     await loadBlocks(selectedDate)
     setShowModal(false)
   }
 
   async function handleDeleteBlock(id) {
-    const all = lsReadBlocks()
-    const block = all.find(b => b.id === id)
-    if (block?.locked) return // safety: never delete locked
-    if (ipc) await ipc.delete(id)
-    else lsWriteBlocks(all.filter(b => b.id !== id))
+    if (ipc) {
+      await ipc.delete(id)
+    } else if (serverMode) {
+      await dataApi.blocks.delete(id)
+    } else {
+      const all = lsReadBlocks()
+      const block = all.find(b => b.id === id)
+      if (block?.locked) return
+      lsWriteBlocks(all.filter(b => b.id !== id))
+    }
     await loadBlocks(selectedDate)
   }
 

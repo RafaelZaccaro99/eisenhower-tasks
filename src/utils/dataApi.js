@@ -43,5 +43,10 @@ export const dataApi = {
     update: (id, body) => call(`/people/${id}`, 'PUT',   body),
     delete: (id)       => call(`/people/${id}`, 'DELETE'),
   },
+  blocks: {
+    list:   ()     => call('/blocks'),
+    create: (body) => call('/blocks',       'POST',   body),
+    delete: (id)   => call(`/blocks/${id}`, 'DELETE'),
+  },
   sync: (tasks, people) => call('/sync', 'POST', { tasks, people }),
 }

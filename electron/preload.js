@@ -13,5 +13,11 @@ contextBridge.exposeInMainWorld('api', {
     create: (block) => ipcRenderer.invoke('agenda:create', block),
     delete: (id) => ipcRenderer.invoke('agenda:delete', id),
   },
+  people: {
+    getAll: () => ipcRenderer.invoke('people:getAll'),
+    create: (person) => ipcRenderer.invoke('people:create', person),
+    update: (person) => ipcRenderer.invoke('people:update', person),
+    delete: (id) => ipcRenderer.invoke('people:delete', id),
+  },
   notify: (opts) => ipcRenderer.invoke('notify', opts),
 })

@@ -97,6 +97,23 @@ app.delete('/api/people/:id', (req, res) => {
   res.json({ ok: true })
 })
 
+// ── Blocks (Agenda) ───────────────────────────────────────────────────────────
+
+app.get('/api/blocks', (_, res) => res.json(readJSON('blocks')))
+
+app.post('/api/blocks', (req, res) => {
+  const blocks = readJSON('blocks')
+  const block = { id: randomUUID(), ...req.body }
+  blocks.push(block)
+  writeJSON('blocks', blocks)
+  res.json(block)
+})
+
+app.delete('/api/blocks/:id', (req, res) => {
+  writeJSON('blocks', readJSON('blocks').filter(b => b.id !== req.params.id))
+  res.json({ ok: true })
+})
+
 // ── Context (for AI) ─────────────────────────────────────────────────────────
 
 app.get('/api/context', (_, res) => {

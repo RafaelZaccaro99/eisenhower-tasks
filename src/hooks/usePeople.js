@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { isServerUp, dataApi } from '../utils/dataApi'
 
+const ipc = window.api?.people
+
 function lsRead() {
   try { return JSON.parse(localStorage.getItem('eisenhower-people') || '[]') } catch { return [] }
 }
@@ -12,6 +14,10 @@ export function usePeople() {
   const [serverMode, setServerMode] = useState(false)
 
   const load = useCallback(async () => {
+    if (ipc) {
+      setPeople(await ipc.getAll())
+      return
+    }
     const up = await isServerUp()
     setServerMode(up)
     if (up) {
@@ -29,17 +35,20 @@ export function usePeople() {
   useEffect(() => { load() }, [load])
 
   const createPerson = useCallback(async (data) => {
-    if (serverMode) {
+    if (ipc) {
+      await ipc.create({ id: uuidv4(), created_at: new Date().toISOString(), ...data })
+    } else if (serverMode) {
       await dataApi.people.create(data)
     } else {
-      const all = lsRead()
-      lsWrite([...all, { id: uuidv4(), created_at: new Date().toISOString(), ...data }])
+      lsWrite([...lsRead(), { id: uuidv4(), created_at: new Date().toISOString(), ...data }])
     }
     await load()
   }, [load, serverMode])
 
   const updatePerson = useCallback(async (data) => {
-    if (serverMode) {
+    if (ipc) {
+      await ipc.update(data)
+    } else if (serverMode) {
       await dataApi.people.update(data.id, data)
     } else {
       const all = lsRead()
@@ -51,7 +60,9 @@ export function usePeople() {
   }, [load, serverMode])
 
   const deletePerson = useCallback(async (id) => {
-    if (serverMode) {
+    if (ipc) {
+      await ipc.delete(id)
+    } else if (serverMode) {
       await dataApi.people.delete(id)
     } else {
       lsWrite(lsRead().filter(p => p.id !== id))

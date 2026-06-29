@@ -12,7 +12,7 @@ let win
 // ── Simple JSON store ─────────────────────────────────────
 function readDb() {
   try { return JSON.parse(fs.readFileSync(dbPath, 'utf-8')) }
-  catch { return { tasks: [], blocks: [] } }
+  catch { return { tasks: [], blocks: [], people: [] } }
 }
 function writeDb(data) {
   fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf-8')
@@ -104,6 +104,35 @@ ipcMain.handle('agenda:create', (_, block) => {
 ipcMain.handle('agenda:delete', (_, id) => {
   const db = readDb()
   db.blocks = db.blocks.filter(b => b.id !== id)
+  writeDb(db)
+  return { success: true }
+})
+
+// ── People ────────────────────────────────────────────────
+ipcMain.handle('people:getAll', () => {
+  return (readDb().people ?? [])
+})
+
+ipcMain.handle('people:create', (_, person) => {
+  const db = readDb()
+  if (!db.people) db.people = []
+  db.people.push(person)
+  writeDb(db)
+  return person
+})
+
+ipcMain.handle('people:update', (_, person) => {
+  const db = readDb()
+  if (!db.people) db.people = []
+  const idx = db.people.findIndex(p => p.id === person.id)
+  if (idx !== -1) db.people[idx] = { ...db.people[idx], ...person }
+  writeDb(db)
+  return db.people[idx]
+})
+
+ipcMain.handle('people:delete', (_, id) => {
+  const db = readDb()
+  db.people = (db.people ?? []).filter(p => p.id !== id)
   writeDb(db)
   return { success: true }
 })
