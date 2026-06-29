@@ -1,0 +1,17 @@
+import { contextBridge, ipcRenderer } from 'electron'
+
+contextBridge.exposeInMainWorld('api', {
+  tasks: {
+    getAll: () => ipcRenderer.invoke('tasks:getAll'),
+    create: (task) => ipcRenderer.invoke('tasks:create', task),
+    update: (task) => ipcRenderer.invoke('tasks:update', task),
+    delete: (id) => ipcRenderer.invoke('tasks:delete', id),
+  },
+  agenda: {
+    getByDate: (date) => ipcRenderer.invoke('agenda:getByDate', date),
+    getRange: (range) => ipcRenderer.invoke('agenda:getRange', range),
+    create: (block) => ipcRenderer.invoke('agenda:create', block),
+    delete: (id) => ipcRenderer.invoke('agenda:delete', id),
+  },
+  notify: (opts) => ipcRenderer.invoke('notify', opts),
+})

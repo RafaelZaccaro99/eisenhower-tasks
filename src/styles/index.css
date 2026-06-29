@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #ffffff;
+    color: #37352f;
+    margin: 0;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #d9d8d5; border-radius: 99px; }
+  ::selection { background: #d3e5ef; }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-100 cursor-pointer select-none;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-100 cursor-pointer select-none bg-[#37352f] text-white hover:bg-[#1a1a18];
+  }
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-100 cursor-pointer select-none text-[#9b9a97] hover:bg-[#f1f1ef] hover:text-[#37352f];
+  }
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors duration-100 cursor-pointer select-none text-[#eb5757] hover:bg-red-50;
+  }
+  .input {
+    @apply w-full bg-transparent border border-[#e9e9e7] rounded-md px-3 py-1.5 text-sm text-[#37352f] placeholder-[#c7c6c3] focus:outline-none focus:ring-1 focus:ring-[#37352f] focus:border-[#37352f] transition-colors duration-100;
+  }
+  .label {
+    @apply block text-xs font-medium text-[#9b9a97] mb-1;
+  }
+  .task-row {
+    @apply flex items-start gap-2 px-3 py-1.5 rounded-md hover:bg-[#f7f6f3] cursor-pointer transition-colors duration-100;
+  }
+  .chip {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+}
