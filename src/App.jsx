@@ -14,7 +14,7 @@ import { usePeople } from './hooks/usePeople'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useNotifications } from './hooks/useNotifications'
-import { isServerUp, dataApi } from './utils/dataApi'
+import { isServerUp, dataApi, setUnauthorizedHandler } from './utils/dataApi'
 import { setProxyToken } from './utils/aiProxy'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -31,8 +31,9 @@ export default function App() {
   const [modal, setModal] = useState(null)
   const [chatOpen, setChatOpen] = useState(false)
 
-  const { user, accessToken, loading: authLoading, signIn, signUp, signOut } = useAuth()
+  const { user, accessToken, loading: authLoading, signIn, signUp, signOut, refreshSession } = useAuth()
   useEffect(() => { setProxyToken(accessToken || '') }, [accessToken])
+  useEffect(() => { setUnauthorizedHandler(refreshSession) }, [refreshSession])
   const { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis } = useSettings(accessToken)

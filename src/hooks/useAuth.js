@@ -86,5 +86,11 @@ export function useAuth() {
     applySession(null)
   }, [session, applySession])
 
-  return { user: session?.user || null, accessToken: session?.access_token || null, loading, signIn, signUp, signOut }
+  const refreshSession = useCallback(async () => {
+    const stored = readSession()
+    if (!stored?.refresh_token) return null
+    return refresh(stored.refresh_token)
+  }, [refresh])
+
+  return { user: session?.user || null, accessToken: session?.access_token || null, loading, signIn, signUp, signOut, refreshSession }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Check, Trash2, RotateCcw, ChevronDown, ChevronRight, Download, Timer, TrendingUp, AlertTriangle } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, isWithinInterval } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -49,10 +49,10 @@ function computeSLA(task, allHistory) {
   return { leadTime, cycleTime, slaOk, daysLate, timeBlockedDays, history: h }
 }
 
-function exportCSV(tasks, statusHistory) {
+function exportCSV(tasks, slaByTask) {
   const headers = ['Título', 'Status', 'Quadrante', 'Categoria', 'Prazo', 'Criada em', 'Lead Time (dias)', 'Cycle Time (dias)', 'SLA']
   const rows = tasks.map(t => {
-    const sla = computeSLA(t, statusHistory)
+    const sla = slaByTask[t.id] || {}
     return [
       `"${(t.title || '').replace(/"/g, '""')}"`,
       t.status || 'completed',
@@ -90,7 +90,7 @@ function StatCard({ label, value, color = 'text-notion-text', dot, sub }) {
   )
 }
 
-function WeekGroup({ weekLabel, tasks, statusHistory, onRestore, onDelete }) {
+function WeekGroup({ weekLabel, tasks, slaByTask, onRestore, onDelete }) {
   const [open, setOpen] = useState(true)
   const [expandedTask, setExpandedTask] = useState(null)
 
@@ -105,7 +105,7 @@ function WeekGroup({ weekLabel, tasks, statusHistory, onRestore, onDelete }) {
       </button>
       {open && tasks.map(task => {
         const q = Q_INFO[task.quadrant] || Q_INFO.q4
-        const sla = computeSLA(task, statusHistory)
+        const sla = slaByTask[task.id] || {}
         const isCancelled = task.status === 'cancelled'
         const isExpanded = expandedTask === task.id
 
@@ -203,6 +203,12 @@ export default function History({ tasks, statusHistory = [], onDelete, onToggle 
   const now = new Date()
   const weekStart = startOfWeek(now, { weekStartsOn: 1 })
 
+  const slaByTask = useMemo(() => {
+    const map = {}
+    done.forEach(t => { map[t.id] = computeSLA(t, statusHistory) })
+    return map
+  }, [done, statusHistory])
+
   const thisWeek = completed.filter(t => {
     try { return parseISO(t.created_at) >= weekStart } catch { return false }
   })
@@ -211,13 +217,13 @@ export default function History({ tasks, statusHistory = [], onDelete, onToggle 
 
   // SLA aggregates
   const withDue      = completed.filter(t => t.due_date)
-  const onTimeTasks  = withDue.filter(t => computeSLA(t, statusHistory).slaOk === true)
+  const onTimeTasks  = withDue.filter(t => slaByTask[t.id]?.slaOk === true)
   const compliance   = withDue.length > 0 ? Math.round((onTimeTasks.length / withDue.length) * 100) : null
 
-  const leadTimes    = completed.map(t => computeSLA(t, statusHistory).leadTime).filter(v => v !== null)
+  const leadTimes    = completed.map(t => slaByTask[t.id]?.leadTime).filter(v => v !== null)
   const avgLead      = leadTimes.length > 0 ? Math.round(leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length) : null
 
-  const cycleTimes   = completed.map(t => computeSLA(t, statusHistory).cycleTime).filter(v => v !== null)
+  const cycleTimes   = completed.map(t => slaByTask[t.id]?.cycleTime).filter(v => v !== null)
   const avgCycle     = cycleTimes.length > 0 ? Math.round(cycleTimes.reduce((a, b) => a + b, 0) / cycleTimes.length) : null
 
   const weeks = []
@@ -257,7 +263,7 @@ export default function History({ tasks, statusHistory = [], onDelete, onToggle 
         </div>
         {done.length > 0 && (
           <button
-            onClick={() => exportCSV(done, statusHistory)}
+            onClick={() => exportCSV(done, slaByTask)}
             className="btn-ghost text-xs"
             title="Exportar histórico como CSV"
           >
@@ -318,7 +324,7 @@ export default function History({ tasks, statusHistory = [], onDelete, onToggle 
               key={week.label}
               weekLabel={week.label}
               tasks={week.tasks}
-              statusHistory={statusHistory}
+              slaByTask={slaByTask}
               onRestore={onToggle}
               onDelete={onDelete}
             />
