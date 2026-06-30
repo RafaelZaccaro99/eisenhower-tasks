@@ -27,7 +27,9 @@ function calcQuadrant(urgent, important) {
 }
 
 function cors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  const origin = process.env.ALLOWED_ORIGIN ||
+    (process.env.NODE_ENV === 'production' ? 'https://eisenhower-tasks.vercel.app' : 'http://localhost:5173')
+  res.setHeader('Access-Control-Allow-Origin', origin)
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
 }

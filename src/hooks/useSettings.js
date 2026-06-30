@@ -42,6 +42,11 @@ async function sbGet(accessToken) {
   } catch { return null }
 }
 
+function stripSecrets(s) {
+  const { aiKeys, slackBotToken, ...rest } = s
+  return rest
+}
+
 async function sbSave(settings, accessToken) {
   try {
     await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -59,7 +64,7 @@ async function sbSave(settings, accessToken) {
 export function useSettings(accessToken) {
   const [settings, setSettings] = useState(lsRead)
 
-  // On login: pull remote settings and merge (remote wins, local AI keys also preserved)
+  // On login: pull remote settings and merge (keys are local-only, never fetched from remote)
   useEffect(() => {
     if (!accessToken) return
     sbGet(accessToken).then(remote => {
@@ -68,8 +73,9 @@ export function useSettings(accessToken) {
       const merged = {
         ...DEFAULTS,
         ...remote,
-        // Merge aiKeys: keep local-only providers, remote wins per-provider
-        aiKeys: { ...(local.aiKeys || {}), ...(remote.aiKeys || {}) },
+        // Keys stay local-only — never pulled from remote to avoid them being read
+        aiKeys: local.aiKeys || {},
+        slackBotToken: local.slackBotToken || '',
       }
       lsWrite(merged)
       setSettings(merged)
@@ -80,7 +86,7 @@ export function useSettings(accessToken) {
     const next = { ...lsRead(), ...patch }
     lsWrite(next)
     setSettings(next)
-    if (accessToken) sbSave(next, accessToken)
+    if (accessToken) sbSave(stripSecrets(next), accessToken)
   }, [accessToken])
 
   const saveAnamnesis = useCallback((anamnesisPatch) => {
@@ -97,7 +103,7 @@ export function useSettings(accessToken) {
     }
     lsWrite(next)
     setSettings(next)
-    if (accessToken) sbSave(next, accessToken)
+    if (accessToken) sbSave(stripSecrets(next), accessToken)
   }, [accessToken])
 
   const toggleAssistant = useCallback(() => {

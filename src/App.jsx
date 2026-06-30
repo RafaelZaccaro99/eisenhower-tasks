@@ -15,6 +15,7 @@ import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useNotifications } from './hooks/useNotifications'
 import { isServerUp, dataApi } from './utils/dataApi'
+import { setProxyToken } from './utils/aiProxy'
 import { v4 as uuidv4 } from 'uuid'
 
 const VIEWS = [
@@ -31,6 +32,7 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(false)
 
   const { user, accessToken, loading: authLoading, signIn, signUp, signOut } = useAuth()
+  useEffect(() => { setProxyToken(accessToken || '') }, [accessToken])
   const { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis } = useSettings(accessToken)

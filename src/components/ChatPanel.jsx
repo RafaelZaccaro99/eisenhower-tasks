@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { X, Send, Bot, Loader2, RotateCcw, CheckCircle2, AlertCircle } from 'lucide-react'
+import { callViaProxy } from '../utils/aiProxy'
 
 function buildSystemPrompt(tasks, people) {
   const today = new Date().toISOString().split('T')[0]
@@ -88,65 +89,6 @@ function actionLabel(action) {
   return 'Ação executada'
 }
 
-async function callAI(messages, systemPrompt, { provider, model, apiKey }) {
-  switch (provider) {
-    case 'anthropic': {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-allow-browser': 'true',
-        },
-        body: JSON.stringify({ model, max_tokens: 1024, system: systemPrompt, messages }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-      return data.content?.[0]?.text
-    }
-    case 'openai':
-    case 'groq':
-    case 'xai': {
-      const base = provider === 'groq' ? 'https://api.groq.com/openai'
-        : provider === 'xai' ? 'https://api.x.ai'
-        : 'https://api.openai.com'
-      const res = await fetch(`${base}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({
-          model, max_tokens: 1024,
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-      return data.choices?.[0]?.message?.content
-    }
-    case 'google': {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents: messages.map(m => ({
-              role: m.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: m.content }],
-            })),
-            generationConfig: { maxOutputTokens: 1024 },
-          }),
-        }
-      )
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-      return data.candidates?.[0]?.content?.parts?.[0]?.text
-    }
-    default:
-      throw new Error(`Provedor desconhecido: ${provider}`)
-  }
-}
 
 const SUGGESTIONS = [
   'Quem tem mais tarefas atrasadas?',
@@ -162,7 +104,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
   const [error, setError] = useState(null)
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-  const systemPrompt = buildSystemPrompt(tasks, people)
+  const systemPrompt = useMemo(() => buildSystemPrompt(tasks, people), [tasks, people])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -227,10 +169,8 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
     setError(null)
 
     try {
-      const reply = await callAI(newHistory, systemPrompt, aiConfig)
-      console.log('[IA] resposta bruta:', reply)
+      const reply = await callViaProxy({ ...aiConfig, messages: newHistory, systemPrompt, maxTokens: 1024 })
       const { cleanText, actions } = parseActions(reply)
-      console.log('[IA] ações detectadas:', actions)
 
       const batch = []
       if (cleanText) batch.push({ role: 'assistant', content: cleanText })
@@ -240,7 +180,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
           await executeAction(action)
           batch.push({ role: 'action', action, success: true })
         } catch (e) {
-          console.error('[IA] erro ao executar ação:', action, e)
+          // action execution errors are non-fatal, show inline
           batch.push({ role: 'action', action, success: false, error: e.message })
         }
       }
