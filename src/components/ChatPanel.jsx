@@ -228,7 +228,9 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
 
     try {
       const reply = await callAI(newHistory, systemPrompt, aiConfig)
+      console.log('[IA] resposta bruta:', reply)
       const { cleanText, actions } = parseActions(reply)
+      console.log('[IA] ações detectadas:', actions)
 
       const batch = []
       if (cleanText) batch.push({ role: 'assistant', content: cleanText })
@@ -238,6 +240,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
           await executeAction(action)
           batch.push({ role: 'action', action, success: true })
         } catch (e) {
+          console.error('[IA] erro ao executar ação:', action, e)
           batch.push({ role: 'action', action, success: false, error: e.message })
         }
       }
