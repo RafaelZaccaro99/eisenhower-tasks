@@ -141,13 +141,18 @@ export default function App() {
           ) : (
             <div className="hidden md:block w-28" />
           )}
-          <button
-            onClick={signOut}
-            title={`Sair (${user.email})`}
-            className="text-notion-muted hover:text-notion-text transition-colors p-1.5 rounded-md hover:bg-notion-surface"
-          >
-            <LogOut size={15} />
-          </button>
+          <div className="flex items-center gap-1.5 pl-1">
+            <span className="hidden sm:inline text-xs text-notion-muted max-w-[140px] truncate">
+              {user.user_metadata?.name || user.email}
+            </span>
+            <button
+              onClick={signOut}
+              title={`Sair (${user.email})`}
+              className="text-notion-muted hover:text-notion-text transition-colors p-1.5 rounded-md hover:bg-notion-surface flex-shrink-0"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
         </div>
       </header>
 
