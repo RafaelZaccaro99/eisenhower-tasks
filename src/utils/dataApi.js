@@ -38,14 +38,27 @@ async function sb(path, method = 'GET', body, upsert = false) {
   return data
 }
 
-// isServerUp agora verifica se as credenciais do Supabase estão disponíveis
-// e se há um usuário autenticado — sem fazer nenhuma chamada de rede extra.
+let _statusCache = null
+let _statusAt = 0
+
+// Ping leve ao Supabase para confirmar que está acessível. Resultado cacheado 30s.
 export async function isServerUp() {
-  return !!(SUPABASE_URL && SUPABASE_ANON_KEY && _authToken)
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !_authToken) return false
+  if (_statusCache !== null && Date.now() - _statusAt < 30_000) return _statusCache
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/tasks?limit=0`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${_authToken}` },
+      signal: AbortSignal.timeout(4000),
+    })
+    _statusCache = res.status < 500
+  } catch {
+    _statusCache = false
+  }
+  _statusAt = Date.now()
+  return _statusCache
 }
 
-// Mantido para compatibilidade — não precisa mais limpar cache
-export function resetServerStatus() {}
+export function resetServerStatus() { _statusCache = null }
 
 export const dataApi = {
   tasks: {

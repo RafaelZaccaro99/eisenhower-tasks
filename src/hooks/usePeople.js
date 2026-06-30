@@ -14,20 +14,36 @@ export function usePeople() {
   const [serverMode, setServerMode] = useState(false)
 
   const load = useCallback(async () => {
-    if (ipc) {
-      setPeople(await ipc.getAll())
-      return
-    }
-    const up = await isServerUp()
-    setServerMode(up)
-    if (up) {
-      const serverPeople = await dataApi.people.list()
-      if (serverPeople.length === 0) {
-        const lsPeople = lsRead()
-        if (lsPeople.length > 0) await dataApi.sync(null, lsPeople)
+    try {
+      if (ipc) {
+        setPeople(await ipc.getAll())
+        return
       }
-      setPeople(await dataApi.people.list())
-    } else {
+      const up = await isServerUp()
+      setServerMode(up)
+      if (up) {
+        const serverPeople = await dataApi.people.list()
+        if (serverPeople.length > 0) {
+          setPeople(serverPeople)
+        } else {
+          const lsPeople = lsRead()
+          if (lsPeople.length > 0) {
+            try {
+              await dataApi.sync(null, lsPeople)
+              const afterSync = await dataApi.people.list()
+              setPeople(afterSync.length > 0 ? afterSync : lsPeople)
+            } catch {
+              setPeople(lsPeople)
+            }
+          } else {
+            setPeople([])
+          }
+        }
+      } else {
+        setPeople(lsRead())
+      }
+    } catch {
+      setServerMode(false)
       setPeople(lsRead())
     }
   }, [])
