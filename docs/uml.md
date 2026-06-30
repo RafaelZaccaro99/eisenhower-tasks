@@ -123,6 +123,7 @@ classDiagram
         +signIn(email, password) Promise
         +signUp(email, password, name) Promise
         +signOut() Promise
+        +refreshSession() Promise
     }
 
     class useTasks {
@@ -149,7 +150,7 @@ classDiagram
     class useSettings {
         +Settings settings
         +save(patch) void
-        +saveAnamnesis(data) void
+        +saveAnamnesis(anamnesisPatch, overrides) void
         +toggleAssistant() void
     }
 
@@ -169,6 +170,7 @@ classDiagram
         +STATUS_CONFIG Object
         +STATUS_TRANSITIONS Object
         +DONE_STATUSES String[]
+        +calcQuadrant(urgent, important) String
     }
 
     class classifier {
@@ -183,8 +185,15 @@ classDiagram
         -parseResult(text) ClassificationResult
     }
 
+    class aiProxy {
+        -String _token
+        +setProxyToken(token) void
+        +callViaProxy(opts) Promise~String~
+    }
+
     class dataApi {
         +setAuthToken(token) void
+        +setUnauthorizedHandler(fn) void
         +isServerUp() Promise~Boolean~
         +resetServerStatus() void
         +tasks TaskEndpoint
@@ -205,6 +214,8 @@ classDiagram
     classifier ..> ClassificationResult : returns
     aiClassifier ..> ClassificationResult : returns
     aiClassifier ..> Anamnesis : uses
+    aiClassifier ..> aiProxy : calls
+    aiProxy ..> dataApi : shares token
     dataApi ..> StatusHistory : persists
 
     %% ─── COMPONENTS ─────────────────────────────────────────────────────────────
@@ -220,6 +231,7 @@ classDiagram
         -String search
         -String filterCategory
         -String filterPerson
+        -String filterStatus
         -String sortBy
         -Boolean showCompleted
         -Number colPct
@@ -319,8 +331,9 @@ classDiagram
         +onCreateBlock(data) Promise
         -buildSystemPrompt() String
         -parseActions(text) Object[]
-        -callAI(messages) Promise~String~
     }
+
+    note for ChatPanel "messages persisted to localStorage\n(eisenhower-chat, max 50)\nAI calls routed via /api/classify proxy"
 
     class SlackComposer {
         -String message
@@ -377,7 +390,7 @@ classDiagram
 
     ChatPanel ..> Task : reads
     ChatPanel ..> Person : reads
-    ChatPanel ..> aiClassifier : calls
+    ChatPanel ..> aiProxy : calls
 
     SlackComposer ..> Person : targets
     SlackComposer ..> Task : attaches
