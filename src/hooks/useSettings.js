@@ -73,9 +73,9 @@ export function useSettings(accessToken) {
       const merged = {
         ...DEFAULTS,
         ...remote,
-        // Keys stay local-only — never pulled from remote to avoid them being read
-        aiKeys: local.aiKeys || {},
-        slackBotToken: local.slackBotToken || '',
+        // Prefer local secrets; fall back to remote for one-time migration from old behavior
+        aiKeys: (local.aiKeys && Object.keys(local.aiKeys).length > 0) ? local.aiKeys : (remote.aiKeys || {}),
+        slackBotToken: local.slackBotToken || remote.slackBotToken || '',
       }
       lsWrite(merged)
       setSettings(merged)
