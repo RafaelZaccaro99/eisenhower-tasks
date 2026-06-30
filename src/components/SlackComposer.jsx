@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X, Send, ChevronDown, CheckSquare, AtSign, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
-import { sendSlackMessage, buildBlocks, taskQuadrant } from '../utils/slack'
+import { sendSlackMessage, buildBlocks } from '../utils/slack'
 
 const Q_LABEL = { q1: '🔴 Fazer agora', q2: '🔵 Agendar', q3: '🟡 Delegar', q4: '⚪ Eliminar' }
 
@@ -49,7 +49,7 @@ export default function SlackComposer({ person, tasks = [], people = [], slackBo
     setErrorMsg('')
     try {
       const fullText = buildFullMessage()
-      const blocks = buildBlocks(fullText, selectedTask ? { ...selectedTask, quadrant: taskQuadrant(selectedTask) } : null)
+      const blocks = buildBlocks(fullText, selectedTask || null)
       await sendSlackMessage(slackBotToken, person.slackId, fullText, blocks)
       setStatus('success')
       setTimeout(onClose, 1800)
@@ -207,7 +207,7 @@ export default function SlackComposer({ person, tasks = [], people = [], slackBo
             {selectedTask && (
               <div className="mt-2 px-3 py-2 rounded-lg bg-notion-surface border border-notion-border text-xs text-notion-sub flex flex-col gap-0.5">
                 <span className="font-medium text-notion-text">{selectedTask.title}</span>
-                <span>{Q_LABEL[taskQuadrant(selectedTask)]}{selectedTask.due_date ? ` · prazo ${selectedTask.due_date}` : ''}</span>
+                <span>{Q_LABEL[selectedTask.quadrant]}{selectedTask.due_date ? ` · prazo ${selectedTask.due_date}` : ''}</span>
               </div>
             )}
           </div>
@@ -220,7 +220,7 @@ export default function SlackComposer({ person, tasks = [], people = [], slackBo
                 {mentions.map(m => `@${m.name.split(' ')[0]}`).join(' ')}{mentions.length > 0 && message.trim() ? ' ' : ''}{message}
                 {selectedTask && (
                   <span className="block mt-2 pt-2 border-t border-white/10 text-[#ABABAD]">
-                    {`📌 ${selectedTask.title}\n${Q_LABEL[taskQuadrant(selectedTask)]}${selectedTask.due_date ? ` · ${selectedTask.due_date}` : ''}`}
+                    {`📌 ${selectedTask.title}\n${Q_LABEL[selectedTask.quadrant]}${selectedTask.due_date ? ` · ${selectedTask.due_date}` : ''}`}
                   </span>
                 )}
               </div>
