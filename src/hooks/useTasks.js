@@ -42,11 +42,22 @@ export function useTasks() {
       setServerMode(up)
       if (up) {
         const serverTasks = await dataApi.tasks.list()
-        if (serverTasks.length === 0) {
+        if (serverTasks.length > 0) {
+          setTasks(serverTasks)
+        } else {
           const lsTasks = lsRead()
-          if (lsTasks.length > 0) await dataApi.sync(lsTasks, null)
+          if (lsTasks.length > 0) {
+            try {
+              await dataApi.sync(lsTasks, null)
+              const afterSync = await dataApi.tasks.list()
+              setTasks(afterSync.length > 0 ? afterSync : lsTasks)
+            } catch {
+              setTasks(lsTasks)
+            }
+          } else {
+            setTasks([])
+          }
         }
-        setTasks(await dataApi.tasks.list())
       } else {
         setTasks(lsRead())
       }
