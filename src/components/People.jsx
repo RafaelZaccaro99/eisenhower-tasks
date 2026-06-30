@@ -176,6 +176,7 @@ export default function People({ people, tasks = [], slackBotToken = '', onCreat
   const [modal, setModal] = useState(null)
   const [slackTarget, setSlackTarget] = useState(null)
   const [search, setSearch] = useState('')
+  const [saveError, setSaveError] = useState(null)
 
   const filtered = people.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -185,14 +186,24 @@ export default function People({ people, tasks = [], slackBotToken = '', onCreat
 
   const byHierarchy = hier => filtered.filter(p => p.hierarchy === hier)
 
-  function handleSave(form) {
-    if (form.id) onUpdate(form)
-    else onCreate(form)
-    setModal(null)
+  async function handleSave(form) {
+    setSaveError(null)
+    try {
+      if (form.id) await onUpdate(form)
+      else await onCreate(form)
+      setModal(null)
+    } catch (e) {
+      setSaveError(e.message || 'Erro ao salvar pessoa')
+    }
   }
 
   return (
     <div className="h-full flex flex-col">
+      {saveError && (
+        <div className="mx-4 md:mx-6 mt-3 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 flex-shrink-0">
+          {saveError}
+        </div>
+      )}
       <div className="flex items-center justify-between gap-2 px-4 md:px-6 py-4 border-b border-notion-border flex-shrink-0">
         <div className="flex-shrink-0">
           <h2 className="text-sm font-semibold text-notion-text">Pessoas</h2>
