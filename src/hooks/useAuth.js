@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { setAuthToken, resetServerStatus } from '../utils/dataApi'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const LS_KEY = 'eisenhower-session'
 
 function readSession() {
@@ -17,6 +19,17 @@ function isExpired(token) {
   } catch { return true }
 }
 
+async function sbAuth(path, body) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1${path}`, {
+    method: 'POST',
+    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error_description || data.msg || 'Erro de autenticação')
+  return data
+}
+
 export function useAuth() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -30,13 +43,7 @@ export function useAuth() {
 
   const refresh = useCallback(async (refreshToken) => {
     try {
-      const res = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
-      })
-      if (!res.ok) throw new Error('expired')
-      const data = await res.json()
+      const data = await sbAuth('/token?grant_type=refresh_token', { refresh_token: refreshToken })
       applySession(data)
       return data
     } catch {
@@ -57,45 +64,27 @@ export function useAuth() {
   }, [applySession, refresh])
 
   const signIn = useCallback(async (email, password) => {
-    const res = await fetch('/api/auth/signin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Erro ao entrar')
+    const data = await sbAuth('/token?grant_type=password', { email, password })
     applySession(data)
     return data
   }, [applySession])
 
   const signUp = useCallback(async (email, password, name) => {
-    const res = await fetch('/api/auth/signup', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, name }),
-    })
-    const data = await res.json()
-    if (!res.ok) throw new Error(data.error || 'Erro ao cadastrar')
-    if (data.confirmation_required) return { confirmation_required: true }
+    const data = await sbAuth('/signup', { email, password, data: { name } })
+    if (!data.access_token) return { confirmation_required: true }
     applySession(data)
     return data
   }, [applySession])
 
   const signOut = useCallback(async () => {
     if (session?.access_token) {
-      fetch('/api/auth/signout', {
+      fetch(`${SUPABASE_URL}/auth/v1/logout`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${session.access_token}` },
       }).catch(() => {})
     }
     applySession(null)
   }, [session, applySession])
 
-  return {
-    user: session?.user || null,
-    loading,
-    signIn,
-    signUp,
-    signOut,
-  }
+  return { user: session?.user || null, loading, signIn, signUp, signOut }
 }
