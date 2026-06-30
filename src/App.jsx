@@ -27,10 +27,10 @@ export default function App() {
   const [modal, setModal] = useState(null)
   const [chatOpen, setChatOpen] = useState(false)
 
-  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
+  const { user, accessToken, loading: authLoading, signIn, signUp, signOut } = useAuth()
   const { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
-  const { settings, save, saveAnamnesis } = useSettings()
+  const { settings, save, saveAnamnesis } = useSettings(accessToken)
 
   useEffect(() => {
     function onKey(e) {

@@ -1,4 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+const LS_KEY = 'eisenhower-settings'
 
 const DEFAULTS = {
   assistantEnabled: true,
@@ -9,17 +13,12 @@ const DEFAULTS = {
   slackBotToken: '',
   onboardingCompleted: false,
   anamnesis: {
-    // Urgência
     urgencyDeadlineDays: 2,
     urgencyTriggers: ['hoje', 'urgente', 'agora', 'prazo', 'vence', 'entrega', 'cliente', 'reunião'],
-    urgencyContexts: [],          // ex: ['cliente X', 'chefe pede']
-
-    // Importância
-    importanceAreas: [],          // ex: ['vendas', 'produto', 'time']
+    urgencyContexts: [],
+    importanceAreas: [],
     importanceTriggers: ['meta', 'estratégia', 'planejamento', 'crescimento', 'objetivo', 'resultado'],
     importanceContexts: [],
-
-    // Delegação
     hasDelegation: true,
     delegatableTriggers: ['relatório', 'planilha', 'enviar', 'agendar', 'pesquisar', 'organizar'],
     delegatableCategories: ['operacional', 'administrativo'],
@@ -27,19 +26,65 @@ const DEFAULTS = {
 }
 
 function lsRead() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('eisenhower-settings') || '{}') } }
-  catch { return DEFAULTS }
+  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(LS_KEY) || '{}') } }
+  catch { return { ...DEFAULTS } }
 }
-function lsWrite(data) { localStorage.setItem('eisenhower-settings', JSON.stringify(data)) }
+function lsWrite(data) { localStorage.setItem(LS_KEY, JSON.stringify(data)) }
 
-export function useSettings() {
+async function sbGet(accessToken) {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${accessToken}` },
+    })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.user_metadata?.eisenhower_settings || null
+  } catch { return null }
+}
+
+async function sbSave(settings, accessToken) {
+  // Never persist API keys or tokens to the server
+  const { aiKeys, slackBotToken, ...safe } = settings
+  try {
+    await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ data: { eisenhower_settings: safe } }),
+    })
+  } catch { /* non-critical */ }
+}
+
+export function useSettings(accessToken) {
   const [settings, setSettings] = useState(lsRead)
+
+  // On login: pull remote settings and merge (remote wins, local AI keys preserved)
+  useEffect(() => {
+    if (!accessToken) return
+    sbGet(accessToken).then(remote => {
+      if (!remote) return
+      const local = lsRead()
+      const merged = {
+        ...DEFAULTS,
+        ...remote,
+        // sensitive fields never leave the device
+        aiKeys: local.aiKeys ?? {},
+        slackBotToken: local.slackBotToken ?? '',
+      }
+      lsWrite(merged)
+      setSettings(merged)
+    })
+  }, [accessToken])
 
   const save = useCallback((patch) => {
     const next = { ...lsRead(), ...patch }
     lsWrite(next)
     setSettings(next)
-  }, [])
+    if (accessToken) sbSave(next, accessToken)
+  }, [accessToken])
 
   const saveAnamnesis = useCallback((anamnesisPatch) => {
     const current = lsRead()
@@ -48,14 +93,15 @@ export function useSettings() {
       ...current,
       anamnesis: { ...current.anamnesis, ...rest },
       onboardingCompleted: true,
-      ...(typeof __aiProvider      !== 'undefined' ? { aiProvider:     __aiProvider      } : {}),
-      ...(typeof __aiModel         !== 'undefined' ? { aiModel:        __aiModel         } : {}),
-      ...(typeof __aiKeys          !== 'undefined' ? { aiKeys:         __aiKeys          } : {}),
-      ...(typeof __slackBotToken   !== 'undefined' ? { slackBotToken:  __slackBotToken   } : {}),
+      ...(typeof __aiProvider    !== 'undefined' ? { aiProvider:    __aiProvider    } : {}),
+      ...(typeof __aiModel       !== 'undefined' ? { aiModel:       __aiModel       } : {}),
+      ...(typeof __aiKeys        !== 'undefined' ? { aiKeys:        __aiKeys        } : {}),
+      ...(typeof __slackBotToken !== 'undefined' ? { slackBotToken: __slackBotToken } : {}),
     }
     lsWrite(next)
     setSettings(next)
-  }, [])
+    if (accessToken) sbSave(next, accessToken)
+  }, [accessToken])
 
   const toggleAssistant = useCallback(() => {
     const current = lsRead()
