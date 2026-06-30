@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut, MessageCircle } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
@@ -14,6 +14,8 @@ import { usePeople } from './hooks/usePeople'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useNotifications } from './hooks/useNotifications'
+import { isServerUp, dataApi } from './utils/dataApi'
+import { v4 as uuidv4 } from 'uuid'
 
 const VIEWS = [
   { key: 'matrix',   label: 'Matriz',        icon: LayoutGrid   },
@@ -77,6 +79,22 @@ export default function App() {
   if (!settings.onboardingCompleted) {
     return <Onboarding onComplete={data => saveAnamnesis(data)} />
   }
+
+  const createBlock = useCallback(async (data) => {
+    const block = { id: uuidv4(), recurrence: 'none', recurrence_end: '', color: '#60a5fa', locked: false, task_id: '', ...data }
+    const ipc = window.api?.agenda
+    if (ipc) {
+      await ipc.create(block)
+      return
+    }
+    const up = await isServerUp()
+    if (up) {
+      await dataApi.blocks.create(block)
+    } else {
+      const all = JSON.parse(localStorage.getItem('eisenhower-blocks') || '[]')
+      localStorage.setItem('eisenhower-blocks', JSON.stringify([...all, block]))
+    }
+  }, [])
 
   function openNew(defaultQuadrant) {
     const presets = {
@@ -253,6 +271,9 @@ export default function App() {
           people={people}
           aiConfig={aiConfig}
           onClose={() => setChatOpen(false)}
+          onCreateTask={createTask}
+          onCreatePerson={createPerson}
+          onCreateBlock={createBlock}
         />
       )}
     </div>

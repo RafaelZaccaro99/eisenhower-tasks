@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { X, Send, Bot, Loader2, RotateCcw } from 'lucide-react'
+import { X, Send, Bot, Loader2, RotateCcw, CheckCircle2, AlertCircle } from 'lucide-react'
 
 function buildSystemPrompt(tasks, people) {
   const today = new Date().toISOString().split('T')[0]
@@ -44,7 +44,40 @@ ${people.map(p => `  ${p.name}${p.slackId ? ` [Slack: ${p.slackId}]` : ''}`).joi
 TAREFAS PENDENTES POR PESSOA:
 ${personStats || 'Nenhuma tarefa delegada.'}
 
-Responda em português de forma direta e objetiva. Seja conciso.`
+AÇÕES DISPONÍVEIS — você pode criar tarefas, pessoas e eventos na agenda:
+Quando o usuário pedir para criar algo, responda em português E inclua ao final um bloco [ACTION]:
+
+Criar tarefa:
+[ACTION]{"type":"create_task","data":{"title":"Título","urgent":true,"important":true,"due_date":"YYYY-MM-DD","category":"geral","delegated_to_name":"Nome (opcional)"}}[/ACTION]
+
+Criar pessoa:
+[ACTION]{"type":"create_person","data":{"name":"Nome Completo","role":"Cargo (opcional)","hierarchy":"Subordinado"}}[/ACTION]
+
+Criar evento na agenda:
+[ACTION]{"type":"create_block","data":{"title":"Título do evento","date":"YYYY-MM-DD","start_time":"09:00","end_time":"10:00"}}[/ACTION]
+
+Hierarquia válida: Superior | Par | Subordinado | Externo
+Categoria válida: geral | trabalho | pessoal | saúde | financeiro | estudo
+due_date formato YYYY-MM-DD (omitir se não mencionado).
+Inclua [ACTION] apenas para criar — nunca para consultas.
+Responda sempre em português de forma direta.`
+}
+
+function parseActions(text) {
+  const actions = []
+  const cleanText = text.replace(/\[ACTION\]([\s\S]*?)\[\/ACTION\]/g, (_, json) => {
+    try { actions.push(JSON.parse(json.trim())) } catch {}
+    return ''
+  }).trim()
+  return { cleanText, actions }
+}
+
+function actionLabel(action) {
+  const d = action.data
+  if (action.type === 'create_task')   return `Tarefa criada: "${d.title}"`
+  if (action.type === 'create_person') return `Pessoa criada: "${d.name}"`
+  if (action.type === 'create_block')  return `Evento criado: "${d.title}" em ${d.date}`
+  return 'Ação executada'
 }
 
 async function callAI(messages, systemPrompt, { provider, model, apiKey }) {
@@ -109,11 +142,12 @@ async function callAI(messages, systemPrompt, { provider, model, apiKey }) {
 
 const SUGGESTIONS = [
   'Quem tem mais tarefas atrasadas?',
-  'Quais são minhas tarefas de Q1?',
-  'Resuma o estado atual do time',
+  'Criar tarefa urgente: Ligar para o cliente hoje',
+  'Adicionar João Silva como subordinado',
+  'Criar reunião de equipe amanhã às 10h',
 ]
 
-export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
+export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTask, onCreatePerson, onCreateBlock }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -132,19 +166,74 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
     }
   }, [])
 
+  async function executeAction(action) {
+    const { type, data } = action
+    if (type === 'create_task') {
+      const person = data.delegated_to_name
+        ? people.find(p => p.name.toLowerCase().includes(data.delegated_to_name.toLowerCase()))
+        : null
+      await onCreateTask({
+        title: data.title,
+        urgent: !!data.urgent,
+        important: !!data.important,
+        due_date: data.due_date || null,
+        category: data.category || 'geral',
+        description: '',
+        delegated_to: person?.id || null,
+      })
+    } else if (type === 'create_person') {
+      await onCreatePerson({
+        name: data.name,
+        role: data.role || '',
+        sector: data.sector || '',
+        hierarchy: data.hierarchy || 'Subordinado',
+        slackId: '',
+        whatsapp: '',
+      })
+    } else if (type === 'create_block') {
+      await onCreateBlock({
+        title: data.title,
+        date: data.date,
+        start_time: data.start_time || '09:00',
+        end_time: data.end_time || '10:00',
+      })
+    } else {
+      throw new Error(`Ação desconhecida: ${type}`)
+    }
+  }
+
   async function send() {
     const text = input.trim()
     if (!text || loading) return
 
-    const newMessages = [...messages, { role: 'user', content: text }]
-    setMessages(newMessages)
+    // Only send user/assistant messages to the API
+    const history = messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role, content: m.content }))
+
+    const newHistory = [...history, { role: 'user', content: text }]
+    setMessages(prev => [...prev, { role: 'user', content: text }])
     setInput('')
     setLoading(true)
     setError(null)
 
     try {
-      const reply = await callAI(newMessages, systemPrompt, aiConfig)
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      const reply = await callAI(newHistory, systemPrompt, aiConfig)
+      const { cleanText, actions } = parseActions(reply)
+
+      const batch = []
+      if (cleanText) batch.push({ role: 'assistant', content: cleanText })
+
+      for (const action of actions) {
+        try {
+          await executeAction(action)
+          batch.push({ role: 'action', action, success: true })
+        } catch (e) {
+          batch.push({ role: 'action', action, success: false, error: e.message })
+        }
+      }
+
+      setMessages(prev => [...prev, ...batch])
     } catch (e) {
       setError(e.message)
       setMessages(prev => prev.slice(0, -1))
@@ -202,7 +291,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center py-8">
               <Bot size={36} className="text-notion-border2" />
               <p className="text-sm text-notion-muted max-w-xs">
-                Pergunte sobre suas tarefas e equipe. Tenho contexto completo de{' '}
+                Pergunte ou peça para criar tarefas, pessoas e eventos. Contexto de{' '}
                 <strong className="text-notion-sub">{tasks.length} tarefas</strong> e{' '}
                 <strong className="text-notion-sub">{people.length} pessoas</strong>.
               </p>
@@ -220,19 +309,35 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
             </div>
           )}
 
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
-                  m.role === 'user'
-                    ? 'bg-notion-text text-white rounded-br-sm'
-                    : 'bg-notion-surface text-notion-text rounded-bl-sm border border-notion-border'
-                }`}
-              >
-                {m.content}
+          {messages.map((m, i) => {
+            if (m.role === 'action') {
+              return (
+                <div key={i} className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+                  m.success
+                    ? 'bg-green-50 text-green-700 border-green-100'
+                    : 'bg-red-50 text-red-600 border-red-100'
+                }`}>
+                  {m.success
+                    ? <CheckCircle2 size={13} className="flex-shrink-0" />
+                    : <AlertCircle size={13} className="flex-shrink-0" />}
+                  <span>{m.success ? actionLabel(m.action) : `Erro: ${m.error}`}</span>
+                </div>
+              )
+            }
+            return (
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap break-words ${
+                    m.role === 'user'
+                      ? 'bg-notion-text text-white rounded-br-sm'
+                      : 'bg-notion-surface text-notion-text rounded-bl-sm border border-notion-border'
+                  }`}
+                >
+                  {m.content}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
 
           {loading && (
             <div className="flex justify-start">
@@ -262,7 +367,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Pergunte sobre tarefas e equipe..."
+              placeholder="Pergunte ou peça para criar algo..."
               rows={1}
               className="input flex-1 resize-none py-2 text-sm"
               style={{ minHeight: '38px', maxHeight: '96px' }}
