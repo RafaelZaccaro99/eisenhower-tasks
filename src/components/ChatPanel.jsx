@@ -44,29 +44,37 @@ ${people.map(p => `  ${p.name}${p.slackId ? ` [Slack: ${p.slackId}]` : ''}`).joi
 TAREFAS PENDENTES POR PESSOA:
 ${personStats || 'Nenhuma tarefa delegada.'}
 
-AÇÕES DISPONÍVEIS — você pode criar tarefas, pessoas e eventos na agenda:
-Quando o usuário pedir para criar algo, responda em português E inclua ao final um bloco [ACTION]:
+INSTRUÇÕES CRÍTICAS PARA CRIAÇÃO:
+Quando o usuário pedir para criar uma tarefa, pessoa ou evento, você DEVE:
+1. Responder em português confirmando o que será criado.
+2. Incluir OBRIGATORIAMENTE um bloco de ação no formato exato abaixo (sem markdown, sem código, sem explicação extra):
 
-Criar tarefa:
-[ACTION]{"type":"create_task","data":{"title":"Título","urgent":true,"important":true,"due_date":"YYYY-MM-DD","category":"geral","delegated_to_name":"Nome (opcional)"}}[/ACTION]
+Para criar tarefa:
+[ACTION]{"type":"create_task","data":{"title":"Título da tarefa","urgent":true,"important":true,"due_date":"YYYY-MM-DD","category":"geral","delegated_to_name":"Nome opcional"}}[/ACTION]
 
-Criar pessoa:
-[ACTION]{"type":"create_person","data":{"name":"Nome Completo","role":"Cargo (opcional)","hierarchy":"Subordinado"}}[/ACTION]
+Para criar pessoa:
+[ACTION]{"type":"create_person","data":{"name":"Nome Completo","role":"Cargo","hierarchy":"Subordinado"}}[/ACTION]
 
-Criar evento na agenda:
+Para criar evento na agenda:
 [ACTION]{"type":"create_block","data":{"title":"Título do evento","date":"YYYY-MM-DD","start_time":"09:00","end_time":"10:00"}}[/ACTION]
 
-Hierarquia válida: Superior | Par | Subordinado | Externo
-Categoria válida: geral | trabalho | pessoal | saúde | financeiro | estudo
-due_date formato YYYY-MM-DD (omitir se não mencionado).
-Inclua [ACTION] apenas para criar — nunca para consultas.
-Responda sempre em português de forma direta.`
+REGRAS:
+- hierarchy deve ser exatamente: Superior, Par, Subordinado ou Externo
+- category deve ser: geral, trabalho, pessoal, saúde, financeiro ou estudo
+- due_date: formato YYYY-MM-DD — omitir o campo se não mencionado
+- NÃO use markdown, blocos de código ou aspas ao redor do [ACTION]
+- Inclua [ACTION] SOMENTE para criar — nunca para consultas ou respostas informativas
+- Responda sempre em português de forma direta e concisa.`
 }
 
 function parseActions(text) {
   const actions = []
   const cleanText = text.replace(/\[ACTION\]([\s\S]*?)\[\/ACTION\]/g, (_, json) => {
-    try { actions.push(JSON.parse(json.trim())) } catch {}
+    try {
+      actions.push(JSON.parse(json.trim()))
+    } catch {
+      actions.push({ __parseError: true, raw: json.trim().slice(0, 120) })
+    }
     return ''
   }).trim()
   return { cleanText, actions }
@@ -167,6 +175,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
   }, [])
 
   async function executeAction(action) {
+    if (action.__parseError) throw new Error(`Formato inválido retornado pela IA: ${action.raw}`)
     const { type, data } = action
     if (type === 'create_task') {
       const person = data.delegated_to_name
