@@ -59,7 +59,7 @@ async function sbSave(settings, accessToken) {
 export function useSettings(accessToken) {
   const [settings, setSettings] = useState(lsRead)
 
-  // On login: pull remote settings and merge (remote wins, local AI keys preserved)
+  // On login: pull remote settings and merge (remote wins, local AI keys also preserved)
   useEffect(() => {
     if (!accessToken) return
     sbGet(accessToken).then(remote => {
@@ -68,6 +68,8 @@ export function useSettings(accessToken) {
       const merged = {
         ...DEFAULTS,
         ...remote,
+        // Merge aiKeys: keep local-only providers, remote wins per-provider
+        aiKeys: { ...(local.aiKeys || {}), ...(remote.aiKeys || {}) },
       }
       lsWrite(merged)
       setSettings(merged)

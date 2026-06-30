@@ -1,10 +1,11 @@
-const { sb, calcQuadrant, cors } = require('../_lib')
+const { sb, calcQuadrant, cors, requireAuth } = require('../_lib')
 
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
+  const token = requireAuth(req, res)
+  if (!token) return
   const { id } = req.query
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     if (req.method === 'PUT') {
@@ -19,6 +20,8 @@ module.exports = async (req, res) => {
         due_date: d.due_date || null,
         category: d.category || 'geral',
         delegated_to: d.delegated_to || null,
+        recurrence: d.recurrence || null,
+        recurrence_end: d.recurrence_end || null,
       }
       const updated = await sb(`/tasks?id=eq.${id}`, 'PATCH', patch, token)
       return res.status(200).json(Array.isArray(updated) ? updated[0] : updated)

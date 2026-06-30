@@ -1,10 +1,11 @@
-const { sb, calcQuadrant, cors } = require('./_lib')
+const { sb, calcQuadrant, cors, requireAuth } = require('./_lib')
 
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
+  const token = requireAuth(req, res)
+  if (!token) return
 
   try {
     const { tasks = [], people = [], blocks = [] } = req.body
@@ -22,6 +23,8 @@ module.exports = async (req, res) => {
         due_date: t.due_date || null,
         category: t.category || 'geral',
         delegated_to: t.delegated_to || null,
+        recurrence: t.recurrence || null,
+        recurrence_end: t.recurrence_end || null,
         created_at: t.created_at || new Date().toISOString(),
       }, token)
       results.tasks++

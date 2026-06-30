@@ -9,6 +9,14 @@ function calcQuadrant(urgent, important) {
   return 'q4'
 }
 
+function nextDueDate(dueDate, recurrence) {
+  const d = new Date(dueDate + 'T00:00:00')
+  if (recurrence === 'daily') d.setDate(d.getDate() + 1)
+  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
+  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
+  return d.toISOString().split('T')[0]
+}
+
 const ipc = window.api?.tasks
 
 function lsRead() {
@@ -63,6 +71,8 @@ export function useTasks() {
       due_date: data.due_date || null,
       category: data.category || 'geral',
       delegated_to: data.delegated_to || null,
+      recurrence: data.recurrence || null,
+      recurrence_end: data.recurrence_end || null,
     }
     if (ipc) {
       await ipc.create({ ...base, id: uuidv4(), created_at: new Date().toISOString(), urgent: base.urgent ? 1 : 0, important: base.important ? 1 : 0 })
@@ -81,6 +91,8 @@ export function useTasks() {
       urgent: !!data.urgent,
       important: !!data.important,
       quadrant: calcQuadrant(data.urgent, data.important),
+      recurrence: data.recurrence || null,
+      recurrence_end: data.recurrence_end || null,
     }
     if (ipc) {
       await ipc.update({ ...patch, urgent: patch.urgent ? 1 : 0, important: patch.important ? 1 : 0 })
@@ -109,7 +121,22 @@ export function useTasks() {
   const toggleStatus = useCallback(async (task) => {
     const next = task.status === 'completed' ? 'pending' : 'completed'
     await updateTask({ ...task, status: next })
-  }, [updateTask])
+
+    // On completing a recurring task, create the next instance
+    if (next === 'completed' && task.recurrence && task.recurrence !== 'none' && task.due_date) {
+      const nextDate = nextDueDate(task.due_date, task.recurrence)
+      const withinEnd = !task.recurrence_end || nextDate <= task.recurrence_end
+      if (withinEnd) {
+        await createTask({
+          ...task,
+          id: undefined,
+          status: 'pending',
+          due_date: nextDate,
+          created_at: undefined,
+        })
+      }
+    }
+  }, [updateTask, createTask])
 
   return { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus }
 }

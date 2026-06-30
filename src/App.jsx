@@ -13,6 +13,7 @@ import { useTasks } from './hooks/useTasks'
 import { usePeople } from './hooks/usePeople'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
+import { useNotifications } from './hooks/useNotifications'
 
 const VIEWS = [
   { key: 'matrix',   label: 'Matriz',        icon: LayoutGrid   },
@@ -31,6 +32,7 @@ export default function App() {
   const { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis } = useSettings(accessToken)
+  useNotifications(tasks, loading)
 
   useEffect(() => {
     function onKey(e) {
@@ -239,6 +241,7 @@ export default function App() {
           assistantEnabled={settings.assistantEnabled}
           aiConfig={aiConfig}
           anamnesis={settings.anamnesis}
+          slackBotToken={settings.slackBotToken}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />
