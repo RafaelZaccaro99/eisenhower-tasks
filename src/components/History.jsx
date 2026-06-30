@@ -131,7 +131,7 @@ export default function History({ tasks, onDelete, onToggle }) {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-3 px-6 py-4 border-b border-notion-border flex-shrink-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 px-4 md:px-6 py-4 border-b border-notion-border flex-shrink-0">
         <StatCard label="Total" value={completed.length} />
         <StatCard label="Esta semana" value={thisWeek.length} color="text-green-600" />
         {['q1', 'q2', 'q3', 'q4'].map(q => (

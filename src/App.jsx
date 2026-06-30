@@ -16,7 +16,7 @@ const VIEWS = [
   { key: 'agenda',   label: 'Agenda',        icon: CalendarDays },
   { key: 'people',   label: 'Pessoas',       icon: Users        },
   { key: 'history',  label: 'Histórico',     icon: Clock        },
-  { key: 'settings', label: 'Configurações', icon: SettingsIcon },
+  { key: 'settings', label: 'Config',        icon: SettingsIcon },
 ]
 
 export default function App() {
@@ -25,17 +25,14 @@ export default function App() {
 
   const { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
-  const { settings, save, saveAnamnesis, toggleAssistant } = useSettings()
+  const { settings, save, saveAnamnesis } = useSettings()
 
-  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e) {
-      // Don't fire while typing in an input/textarea or while a modal is open
       const tag = e.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (modal) return
 
-      // Ctrl+K / Cmd+K → focus search in matrix
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
         if (view !== 'matrix') setView('matrix')
@@ -82,25 +79,26 @@ export default function App() {
   const showNewButton = view !== 'people' && view !== 'settings' && view !== 'history'
 
   return (
-    <div className="h-screen flex flex-col bg-white overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-white overflow-hidden">
       {/* Top bar */}
-      <header className="flex items-center justify-between px-6 h-12 border-b border-notion-border flex-shrink-0">
-        <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between px-4 md:px-6 h-12 border-b border-notion-border flex-shrink-0">
+        <div className="flex items-center gap-2 md:gap-4">
           <span className="text-sm font-semibold text-notion-text tracking-tight">Eisenhower</span>
-          <span className="text-xs text-notion-muted">{pending} pendente{pending !== 1 ? 's' : ''}</span>
+          <span className="hidden sm:inline text-xs text-notion-muted">{pending} pendente{pending !== 1 ? 's' : ''}</span>
           {serverMode && (
-            <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-md font-medium">
-              ⬡ MCP ativo
+            <span className="hidden sm:inline text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-md font-medium">
+              ⬡ MCP
             </span>
           )}
           {settings.assistantEnabled && (
-            <span className="text-xs text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md font-medium">
-              {settings.aiEnabled && (settings.aiKeys || {})[settings.aiProvider] ? '✦ IA ativa' : '⚡ assistente ativo'}
+            <span className="hidden sm:inline text-xs text-amber-500 bg-amber-50 px-2 py-0.5 rounded-md font-medium">
+              {settings.aiEnabled && (settings.aiKeys || {})[settings.aiProvider] ? '✦ IA' : '⚡'}
             </span>
           )}
         </div>
 
-        <nav className="flex items-center gap-1">
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-1">
           {VIEWS.map(v => {
             const Icon = v.icon
             return (
@@ -118,12 +116,14 @@ export default function App() {
           })}
         </nav>
 
+        {/* Right: new task button */}
         {showNewButton ? (
           <button onClick={() => openNew('q2')} className="btn-primary">
-            <Plus size={14} /> Nova tarefa
+            <Plus size={14} />
+            <span className="hidden sm:inline">Nova tarefa</span>
           </button>
         ) : (
-          <div className="w-28" />
+          <div className="w-8 md:w-28" />
         )}
       </header>
 
@@ -144,19 +144,12 @@ export default function App() {
           <Agenda tasks={tasks} />
         ) : view === 'people' ? (
           <People
-            people={people}
-            tasks={tasks}
+            people={people} tasks={tasks}
             slackBotToken={settings.slackBotToken}
-            onCreate={createPerson}
-            onUpdate={updatePerson}
-            onDelete={deletePerson}
+            onCreate={createPerson} onUpdate={updatePerson} onDelete={deletePerson}
           />
         ) : view === 'history' ? (
-          <History
-            tasks={tasks}
-            onDelete={deleteTask}
-            onToggle={toggleStatus}
-          />
+          <History tasks={tasks} onDelete={deleteTask} onToggle={toggleStatus} />
         ) : (
           <Settings
             settings={settings}
@@ -168,6 +161,24 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Bottom nav — mobile only */}
+      <nav className="md:hidden flex-shrink-0 border-t border-notion-border bg-white flex"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {VIEWS.map(v => {
+          const Icon = v.icon
+          return (
+            <button key={v.key} onClick={() => setView(v.key)}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2 transition-colors ${
+                view === v.key ? 'text-notion-text' : 'text-notion-muted'
+              }`}
+            >
+              <Icon size={20} strokeWidth={view === v.key ? 2.2 : 1.7} />
+              <span className="text-[10px] font-medium">{v.label}</span>
+            </button>
+          )
+        })}
+      </nav>
 
       {modal && (
         <TaskModal
