@@ -22,6 +22,18 @@ classDiagram
         +String created_at
     }
 
+    note for Task "status: pending | in_progress | review\n        | blocked | completed | cancelled\noverdue: computed (due_date < today && active)"
+
+    class StatusHistory {
+        +String id
+        +String task_id
+        +String from_status
+        +String to_status
+        +String changed_at
+        +String note
+        +String user_id
+    }
+
     class Person {
         +String id
         +String name
@@ -85,7 +97,21 @@ classDiagram
         +String error
     }
 
+    class SLAResult {
+        +Number leadTime
+        +Number cycleTime
+        +Boolean slaOk
+        +Number daysLate
+        +Number timeBlockedDays
+        +StatusHistory[] history
+    }
+
     Settings *-- Anamnesis
+    Task "1" --> "0..*" StatusHistory : transitions
+
+    %% ─── STATUS MACHINE ──────────────────────────────────────────────────────
+
+    note for StatusHistory "Transitions:\npending → in_progress, cancelled\nin_progress → review, blocked, completed, cancelled\nreview → in_progress, completed, cancelled\nblocked → in_progress, cancelled\ncompleted → pending\ncancelled → pending"
 
     %% ─── HOOKS ─────────────────────────────────────────────────────────────────
 
@@ -101,11 +127,14 @@ classDiagram
 
     class useTasks {
         -String mode
+        -Ref tasksRef
+        -Ref serverModeRef
         +Task[] tasks
+        +StatusHistory[] statusHistory
         +Boolean loading
         +Boolean serverMode
         +createTask(data) Promise
-        +updateTask(data) Promise
+        +updateTask(data, note) Promise
         +deleteTask(id) Promise
         +toggleStatus(task) Promise
     }
@@ -130,10 +159,17 @@ classDiagram
     }
 
     useTasks ..> Task : manages
+    useTasks ..> StatusHistory : records
     usePeople ..> Person : manages
     useSettings ..> Settings : manages
 
     %% ─── UTILITY MODULES ────────────────────────────────────────────────────────
+
+    class statusConfig {
+        +STATUS_CONFIG Object
+        +STATUS_TRANSITIONS Object
+        +DONE_STATUSES String[]
+    }
 
     class classifier {
         +classifyTask(title, dueDate, anamnesis) ClassificationResult
@@ -154,6 +190,7 @@ classDiagram
         +tasks TaskEndpoint
         +people PeopleEndpoint
         +blocks BlocksEndpoint
+        +status_history StatusHistoryEndpoint
         +sync(tasks, people, blocks) Promise
     }
 
@@ -168,6 +205,7 @@ classDiagram
     classifier ..> ClassificationResult : returns
     aiClassifier ..> ClassificationResult : returns
     aiClassifier ..> Anamnesis : uses
+    dataApi ..> StatusHistory : persists
 
     %% ─── COMPONENTS ─────────────────────────────────────────────────────────────
 
@@ -212,6 +250,8 @@ classDiagram
         +onClose() void
     }
 
+    note for TaskModal "Status selector shows current status\n+ valid transitions from statusConfig"
+
     class Agenda {
         -Date selectedDate
         -Date weekStart
@@ -232,9 +272,16 @@ classDiagram
 
     class History {
         +tasks Task[]
+        +statusHistory StatusHistory[]
         +onDelete(id) void
         +onToggle(task) void
+        -computeSLA(task, history) SLAResult
+        -compliance Number
+        -avgLead Number
+        -avgCycle Number
     }
+
+    note for History "SLA metrics:\n- Conformidade (% no prazo)\n- Lead time médio\n- Cycle time médio\nPer-task: timeline de transições"
 
     class SettingsComponent {
         +settings Settings
@@ -307,11 +354,14 @@ classDiagram
 
     Matrix ..> Task : displays
     Matrix ..> Person : references
+    Matrix ..> statusConfig : uses
+
     TaskModal ..> Task : edits
     TaskModal ..> Person : lists
     TaskModal ..> classifier : uses
     TaskModal ..> aiClassifier : uses
     TaskModal ..> slack : sends via
+    TaskModal ..> statusConfig : uses
 
     Agenda ..> Block : manages
     Agenda ..> Task : links
@@ -320,7 +370,10 @@ classDiagram
     People ..> Task : groups
     People *-- SlackComposer
 
-    History ..> Task : shows completed
+    History ..> Task : shows done
+    History ..> StatusHistory : reads
+    History ..> SLAResult : computes
+    History ..> statusConfig : uses
 
     ChatPanel ..> Task : reads
     ChatPanel ..> Person : reads
@@ -343,3 +396,4 @@ Sempre que houver mudanças significativas na arquitetura (novos modelos, hooks,
 - Novos hooks ou mudança de interface
 - Novos componentes ou remoção de existentes
 - Novas integrações externas
+- Mudanças na máquina de estados de status

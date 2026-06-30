@@ -31,7 +31,7 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(false)
 
   const { user, accessToken, loading: authLoading, signIn, signUp, signOut } = useAuth()
-  const { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
+  const { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis } = useSettings(accessToken)
   useNotifications(tasks, loading)
@@ -112,7 +112,7 @@ export default function App() {
     setModal(null)
   }
 
-  const pending = tasks.filter(t => t.status !== 'completed').length
+  const pending = tasks.filter(t => !['completed', 'cancelled'].includes(t.status)).length
   const showNewButton = view !== 'people' && view !== 'settings' && view !== 'history'
   const aiConfig = {
     enabled:  settings.aiEnabled,
@@ -214,7 +214,7 @@ export default function App() {
             onCreate={createPerson} onUpdate={updatePerson} onDelete={deletePerson}
           />
         ) : view === 'history' ? (
-          <History tasks={tasks} onDelete={deleteTask} onToggle={toggleStatus} />
+          <History tasks={tasks} statusHistory={statusHistory} onDelete={deleteTask} onToggle={toggleStatus} />
         ) : (
           <Settings
             settings={settings}

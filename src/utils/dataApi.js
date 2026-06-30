@@ -79,6 +79,10 @@ export const dataApi = {
     update: (id, body) => sb(`/blocks?id=eq.${id}`, 'PATCH', body),
     delete: (id)       => sb(`/blocks?id=eq.${id}`, 'DELETE'),
   },
+  status_history: {
+    list:   ()     => sb('/status_history?order=changed_at.asc&limit=2000'),
+    create: (body) => sb('/status_history', 'POST', { ...body, user_id: getUserId() }),
+  },
   sync: async (tasks, people, blocks) => {
     const uid = getUserId()
     if (!uid) return { ok: true }
