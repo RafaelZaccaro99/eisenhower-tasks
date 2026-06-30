@@ -91,7 +91,7 @@ export default function Settings({ settings, onSave, onRestartOnboarding }) {
   }
 
   function handleSave() {
-    onSave({ ...local, __aiProvider: aiProvider, __aiModel: aiModel, __aiKeys: aiKeys, __slackBotToken: slackBotToken })
+    onSave(local, { aiProvider, aiModel, aiKeys, slackBotToken })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Check, Plus, Trash2, User, Search, X, Eye, EyeOff, SlidersHorizontal, RefreshCw, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { STATUS_CONFIG, DONE_STATUSES } from '../utils/statusConfig'
 
 const QUADRANTS = [
   { key: 'q1', label: 'Fazer agora',  sub: 'Urgente · Importante',         dot: 'bg-red-400',        chip: 'bg-red-50 text-red-500',             urgent: true,  important: true  },
@@ -10,13 +11,14 @@ const QUADRANTS = [
   { key: 'q4', label: 'Eliminar',     sub: 'Não urgente · Não importante', dot: 'bg-notion-border2', chip: 'bg-notion-surface text-notion-muted', urgent: false, important: false },
 ]
 
-const TODAY = new Date().toISOString().split('T')[0]
-
 function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
+  const today = new Date().toISOString().split('T')[0]
   const done = task.status === 'completed'
-  const isOverdue = !done && task.due_date && task.due_date < TODAY
-  const isDueToday = !done && task.due_date === TODAY
+  const isCancelled = task.status === 'cancelled'
+  const isOverdue = !done && !isCancelled && task.due_date && task.due_date < today
+  const isDueToday = !done && !isCancelled && task.due_date === today
   const hasRecurrence = task.recurrence && task.recurrence !== 'none'
+  const statusCfg = STATUS_CONFIG[task.status]
 
   return (
     <div
@@ -36,7 +38,7 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
-          <span className={`text-sm leading-5 ${done ? 'line-through text-notion-muted' : 'text-notion-text'}`}>
+          <span className={`text-sm leading-5 ${done || isCancelled ? 'line-through text-notion-muted' : 'text-notion-text'}`}>
             {task.title}
           </span>
           {isOverdue && <AlertCircle size={12} className="flex-shrink-0 text-red-400" />}
@@ -60,6 +62,11 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
               <User size={10} /> {person.name.split(' ')[0]}
             </span>
           )}
+          {statusCfg && task.status !== 'pending' && task.status !== 'completed' && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${statusCfg.bg} ${statusCfg.color}`}>
+              {statusCfg.label}
+            </span>
+          )}
         </div>
       </div>
 
@@ -74,9 +81,11 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
 }
 
 export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, onToggle, onMoveTask }) {
+  const today = new Date().toISOString().split('T')[0]
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPerson, setFilterPerson] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
@@ -117,7 +126,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
 
   const findPerson = id => people.find(p => p.id === id)
   const categories = [...new Set(tasks.map(t => t.category).filter(c => c && c !== 'geral'))]
-  const hasFilters = search || filterCategory || filterPerson || !showCompleted || sortBy
+  const hasFilters = search || filterCategory || filterPerson || filterStatus || !showCompleted || sortBy
 
   function applySort(list) {
     if (!sortBy) return list
@@ -145,10 +154,11 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   function filterTasks(qKey) {
     const filtered = tasks.filter(t => {
       if (t.quadrant !== qKey) return false
-      if (!showCompleted && t.status === 'completed') return false
+      if (!showCompleted && DONE_STATUSES.includes(t.status)) return false
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterCategory && t.category !== filterCategory) return false
       if (filterPerson && t.delegated_to !== filterPerson) return false
+      if (filterStatus && t.status !== filterStatus) return false
       return true
     })
     return applySort(filtered)
@@ -170,7 +180,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   }
 
   function clearFilters() {
-    setSearch(''); setFilterCategory(''); setFilterPerson(''); setShowCompleted(true); setSortBy('')
+    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterStatus(''); setShowCompleted(true); setSortBy('')
   }
 
   const SortSelect = ({ className = '' }) => (
@@ -250,6 +260,13 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
               {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
             </select>
           )}
+          <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
+            value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">Status</option>
+            {['in_progress', 'review', 'blocked'].map(s => (
+              <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>
+            ))}
+          </select>
           <SortSelect className="hidden md:block" />
           <button onClick={() => setShowCompleted(v => !v)}
             className={`hidden md:flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
@@ -293,6 +310,13 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
                 {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
               </select>
             )}
+            <select className="text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none flex-1"
+              value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">Status</option>
+              {['in_progress', 'review', 'blocked'].map(s => (
+                <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>
+              ))}
+            </select>
             <SortSelect className="flex-1" />
             <button onClick={() => setShowCompleted(v => !v)}
               className={`flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
@@ -314,8 +338,8 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       <div className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-shrink-0 border-b border-notion-border">
           {QUADRANTS.map(q => {
-            const pending = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed').length
-            const overdue = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed' && t.due_date && t.due_date < TODAY).length
+            const pending = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status)).length
+            const overdue = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < today).length
             const active = mobileQ === q.key
             return (
               <button key={q.key} onClick={() => setMobileQ(q.key)}
@@ -359,8 +383,8 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       {/* DESKTOP: resizable 2×2 layout */}
       {(() => {
         function DesktopQuadrant({ q, style }) {
-          const pending = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed').length
-          const overdue = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed' && t.due_date && t.due_date < TODAY).length
+          const pending = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status)).length
+          const overdue = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < today).length
           const isDropTarget = dragOverKey === q.key
           return (
             <div

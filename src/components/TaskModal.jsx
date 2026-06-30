@@ -3,6 +3,7 @@ import { X, Check, Zap, ZapOff, ChevronDown, Loader2, RefreshCw, MessageSquare }
 import { classifyTask, quadrantLabel } from '../utils/classifier'
 import { classifyTaskWithAI } from '../utils/aiClassifier'
 import { sendSlackMessage, buildBlocks } from '../utils/slack'
+import { STATUS_CONFIG, STATUS_TRANSITIONS, calcQuadrant } from '../utils/statusConfig'
 
 const CATEGORIES = ['geral', 'trabalho', 'pessoal', 'saúde', 'financeiro', 'estudo']
 const RECURRENCES = [
@@ -26,12 +27,6 @@ const Q_SUGGESTION_STYLE = {
   q4: 'border-notion-border bg-notion-surface text-notion-sub',
 }
 
-function calcQ(urgent, important) {
-  if (urgent && important) return 'q1'
-  if (!urgent && important) return 'q2'
-  if (urgent && !important) return 'q3'
-  return 'q4'
-}
 
 function Toggle({ label, active, onClick, activeClass }) {
   return (
@@ -57,6 +52,7 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
     recurrence: 'none', recurrence_end: '',
     ...task,
     recurrence: task?.recurrence || 'none',
+    status: task?.status || 'pending',
   })
   const [useAssistant, setUseAssistant] = useState(assistantEnabled)
   const [suggestion, setSuggestion] = useState(null)
@@ -69,7 +65,7 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const q = calcQ(form.urgent, form.important)
+  const q = calcQuadrant(form.urgent, form.important)
   const qInfo = Q_LABELS[q]
 
   const delegatee = form.delegated_to ? people.find(p => p.id === form.delegated_to) : null
@@ -118,7 +114,6 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
     e.preventDefault()
     if (!form.title.trim()) return
 
-    // Send Slack notification before saving (fire and don't block)
     if (notifySlack && canNotifySlack) {
       setSlackStatus('sending')
       try {
@@ -137,6 +132,10 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
     }
     onSave(cleanForm)
   }
+
+  const statusOptions = isEdit
+    ? [form.status, ...(STATUS_TRANSITIONS[form.status] || [])]
+    : []
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
@@ -221,6 +220,35 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
             </div>
           )}
 
+          {/* Status — only when editing */}
+          {isEdit && (
+            <div>
+              <p className="label mb-2">Status</p>
+              <div className="flex flex-wrap gap-2">
+                {statusOptions.map(s => {
+                  const cfg = STATUS_CONFIG[s]
+                  if (!cfg) return null
+                  const isCurrent = form.status === s
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => set('status', s)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-xs font-medium transition-all ${
+                        isCurrent
+                          ? `${cfg.bg} ${cfg.color} border-current`
+                          : 'border-notion-border text-notion-muted hover:border-notion-border2 hover:text-notion-sub'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${cfg.dot}`} />
+                      {cfg.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Classificação */}
           <div>
             <p className="label mb-2">Classificação</p>
@@ -243,7 +271,6 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
               <p className="text-xs text-notion-muted mt-1">Cadastre pessoas na aba "Pessoas" primeiro.</p>
             )}
 
-            {/* Slack notification checkbox — only when q3 and Slack is configured */}
             {canNotifySlack && (
               <label className="flex items-center gap-2 mt-2 cursor-pointer group">
                 <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${

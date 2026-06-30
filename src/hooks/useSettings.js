@@ -42,6 +42,11 @@ async function sbGet(accessToken) {
   } catch { return null }
 }
 
+function stripSecrets(s) {
+  const { aiKeys, slackBotToken, ...rest } = s
+  return rest
+}
+
 async function sbSave(settings, accessToken) {
   try {
     await fetch(`${SUPABASE_URL}/auth/v1/user`, {
@@ -59,7 +64,7 @@ async function sbSave(settings, accessToken) {
 export function useSettings(accessToken) {
   const [settings, setSettings] = useState(lsRead)
 
-  // On login: pull remote settings and merge (remote wins, local AI keys also preserved)
+  // On login: pull remote settings and merge (keys are local-only, never fetched from remote)
   useEffect(() => {
     if (!accessToken) return
     sbGet(accessToken).then(remote => {
@@ -68,8 +73,9 @@ export function useSettings(accessToken) {
       const merged = {
         ...DEFAULTS,
         ...remote,
-        // Merge aiKeys: keep local-only providers, remote wins per-provider
-        aiKeys: { ...(local.aiKeys || {}), ...(remote.aiKeys || {}) },
+        // Prefer local secrets; fall back to remote for one-time migration from old behavior
+        aiKeys: (local.aiKeys && Object.keys(local.aiKeys).length > 0) ? local.aiKeys : (remote.aiKeys || {}),
+        slackBotToken: local.slackBotToken || remote.slackBotToken || '',
       }
       lsWrite(merged)
       setSettings(merged)
@@ -80,24 +86,20 @@ export function useSettings(accessToken) {
     const next = { ...lsRead(), ...patch }
     lsWrite(next)
     setSettings(next)
-    if (accessToken) sbSave(next, accessToken)
+    if (accessToken) sbSave(stripSecrets(next), accessToken)
   }, [accessToken])
 
-  const saveAnamnesis = useCallback((anamnesisPatch) => {
+  const saveAnamnesis = useCallback((anamnesisPatch, overrides = {}) => {
     const current = lsRead()
-    const { __aiProvider, __aiModel, __aiKeys, __slackBotToken, ...rest } = anamnesisPatch
     const next = {
       ...current,
-      anamnesis: { ...current.anamnesis, ...rest },
+      anamnesis: { ...current.anamnesis, ...anamnesisPatch },
       onboardingCompleted: true,
-      ...(typeof __aiProvider    !== 'undefined' ? { aiProvider:    __aiProvider    } : {}),
-      ...(typeof __aiModel       !== 'undefined' ? { aiModel:       __aiModel       } : {}),
-      ...(typeof __aiKeys        !== 'undefined' ? { aiKeys:        __aiKeys        } : {}),
-      ...(typeof __slackBotToken !== 'undefined' ? { slackBotToken: __slackBotToken } : {}),
+      ...overrides,
     }
     lsWrite(next)
     setSettings(next)
-    if (accessToken) sbSave(next, accessToken)
+    if (accessToken) sbSave(stripSecrets(next), accessToken)
   }, [accessToken])
 
   const toggleAssistant = useCallback(() => {

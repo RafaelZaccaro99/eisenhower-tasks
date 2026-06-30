@@ -1,3 +1,5 @@
+import { callViaProxy } from './aiProxy'
+
 export const PROVIDERS = {
   anthropic: {
     label: 'Anthropic Claude',
@@ -91,79 +93,15 @@ function parseResult(text) {
   return r
 }
 
-async function callAnthropic(prompt, model, apiKey) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-allow-browser': 'true',
-    },
-    body: JSON.stringify({ model, max_tokens: 256, messages: [{ role: 'user', content: prompt }] }),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-  return data.content?.[0]?.text
-}
-
-async function callOpenAI(prompt, model, apiKey, baseUrl = 'https://api.openai.com') {
-  const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      max_tokens: 256,
-      response_format: { type: 'json_object' },
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-  return data.choices?.[0]?.message?.content
-}
-
-async function callGemini(prompt, model, apiKey) {
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 256, responseMimeType: 'application/json' },
-      }),
-    }
-  )
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message ?? `HTTP ${res.status}`)
-  return data.candidates?.[0]?.content?.parts?.[0]?.text
-}
-
 export async function classifyTaskWithAI(title, dueDate, anamnesis, { provider, model, apiKey }) {
   if (!apiKey || !title.trim()) return null
   const prompt = buildPrompt(title, dueDate, anamnesis)
-
-  let text
-  switch (provider) {
-    case 'anthropic':
-      text = await callAnthropic(prompt, model, apiKey)
-      break
-    case 'openai':
-      text = await callOpenAI(prompt, model, apiKey)
-      break
-    case 'groq':
-      text = await callOpenAI(prompt, model, apiKey, 'https://api.groq.com/openai')
-      break
-    case 'xai':
-      text = await callOpenAI(prompt, model, apiKey, 'https://api.x.ai')
-      break
-    case 'google':
-      text = await callGemini(prompt, model, apiKey)
-      break
-    default:
-      throw new Error(`Provedor desconhecido: ${provider}`)
-  }
-
+  const text = await callViaProxy({
+    provider,
+    model,
+    apiKey,
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 256,
+  })
   return parseResult(text)
 }

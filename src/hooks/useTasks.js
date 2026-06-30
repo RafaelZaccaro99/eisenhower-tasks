@@ -1,13 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { isServerUp, dataApi } from '../utils/dataApi'
-
-function calcQuadrant(urgent, important) {
-  if (urgent && important) return 'q1'
-  if (!urgent && important) return 'q2'
-  if (urgent && !important) return 'q3'
-  return 'q4'
-}
+import { calcQuadrant } from '../utils/statusConfig'
 
 function nextDueDate(dueDate, recurrence) {
   const d = new Date(dueDate + 'T00:00:00')
@@ -25,21 +19,35 @@ function lsRead() {
 function lsWrite(tasks) {
   localStorage.setItem('eisenhower-tasks', JSON.stringify(tasks))
 }
+function lsReadHistory() {
+  try { return JSON.parse(localStorage.getItem('eisenhower-status-history') || '[]') } catch { return [] }
+}
+function lsWriteHistory(entries) {
+  localStorage.setItem('eisenhower-status-history', JSON.stringify(entries))
+}
 
 export function useTasks() {
   const [tasks, setTasks] = useState([])
+  const [statusHistory, setStatusHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [serverMode, setServerMode] = useState(false)
+  const tasksRef = useRef([])
+  const serverModeRef = useRef(false)
+
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
+  useEffect(() => { serverModeRef.current = serverMode }, [serverMode])
 
   const load = useCallback(async () => {
     try {
       if (ipc) {
         const all = await ipc.getAll()
         setTasks(all.map(t => ({ ...t, urgent: !!t.urgent, important: !!t.important })))
+        setStatusHistory(lsReadHistory())
         return
       }
       const up = await isServerUp()
       setServerMode(up)
+      serverModeRef.current = up
       if (up) {
         const serverTasks = await dataApi.tasks.list()
         if (serverTasks.length > 0) {
@@ -48,7 +56,8 @@ export function useTasks() {
           const lsTasks = lsRead()
           if (lsTasks.length > 0) {
             try {
-              await dataApi.sync(lsTasks, null)
+              const lsBlocks = JSON.parse(localStorage.getItem('eisenhower-blocks') || '[]')
+              await dataApi.sync(lsTasks, null, lsBlocks)
               const afterSync = await dataApi.tasks.list()
               setTasks(afterSync.length > 0 ? afterSync : lsTasks)
             } catch {
@@ -58,12 +67,21 @@ export function useTasks() {
             setTasks([])
           }
         }
+        try {
+          const serverHistory = await dataApi.status_history.list()
+          setStatusHistory(Array.isArray(serverHistory) ? serverHistory : [])
+        } catch {
+          setStatusHistory(lsReadHistory())
+        }
       } else {
         setTasks(lsRead())
+        setStatusHistory(lsReadHistory())
       }
     } catch {
       setServerMode(false)
+      serverModeRef.current = false
       setTasks(lsRead())
+      setStatusHistory(lsReadHistory())
     } finally {
       setLoading(false)
     }
@@ -87,16 +105,16 @@ export function useTasks() {
     }
     if (ipc) {
       await ipc.create({ ...base, id: uuidv4(), created_at: new Date().toISOString(), urgent: base.urgent ? 1 : 0, important: base.important ? 1 : 0 })
-    } else if (serverMode) {
+    } else if (serverModeRef.current) {
       await dataApi.tasks.create(base)
     } else {
       const all = lsRead()
       lsWrite([...all, { ...base, id: uuidv4(), created_at: new Date().toISOString() }])
     }
     await load()
-  }, [load, serverMode])
+  }, [load])
 
-  const updateTask = useCallback(async (data) => {
+  const updateTask = useCallback(async (data, note = '') => {
     const patch = {
       ...data,
       urgent: !!data.urgent,
@@ -105,9 +123,28 @@ export function useTasks() {
       recurrence: data.recurrence || null,
       recurrence_end: data.recurrence_end || null,
     }
+
+    // Record status transition if status changed
+    const existing = tasksRef.current.find(t => t.id === data.id)
+    if (existing && data.status && existing.status !== data.status) {
+      const entry = {
+        id: uuidv4(),
+        task_id: data.id,
+        from_status: existing.status,
+        to_status: data.status,
+        changed_at: new Date().toISOString(),
+        note: note || '',
+      }
+      if (serverModeRef.current) {
+        try { await dataApi.status_history.create(entry) } catch {}
+      } else {
+        lsWriteHistory([...lsReadHistory(), entry])
+      }
+    }
+
     if (ipc) {
       await ipc.update({ ...patch, urgent: patch.urgent ? 1 : 0, important: patch.important ? 1 : 0 })
-    } else if (serverMode) {
+    } else if (serverModeRef.current) {
       await dataApi.tasks.update(patch.id, patch)
     } else {
       const all = lsRead()
@@ -116,24 +153,23 @@ export function useTasks() {
       lsWrite(all)
     }
     await load()
-  }, [load, serverMode])
+  }, [load])
 
   const deleteTask = useCallback(async (id) => {
     if (ipc) {
       await ipc.delete(id)
-    } else if (serverMode) {
+    } else if (serverModeRef.current) {
       await dataApi.tasks.delete(id)
     } else {
       lsWrite(lsRead().filter(t => t.id !== id))
     }
     await load()
-  }, [load, serverMode])
+  }, [load])
 
   const toggleStatus = useCallback(async (task) => {
     const next = task.status === 'completed' ? 'pending' : 'completed'
     await updateTask({ ...task, status: next })
 
-    // On completing a recurring task, create the next instance
     if (next === 'completed' && task.recurrence && task.recurrence !== 'none' && task.due_date) {
       const nextDate = nextDueDate(task.due_date, task.recurrence)
       const withinEnd = !task.recurrence_end || nextDate <= task.recurrence_end
@@ -149,5 +185,5 @@ export function useTasks() {
     }
   }, [updateTask, createTask])
 
-  return { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus }
+  return { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus }
 }
