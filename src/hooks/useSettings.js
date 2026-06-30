@@ -43,8 +43,6 @@ async function sbGet(accessToken) {
 }
 
 async function sbSave(settings, accessToken) {
-  // Never persist API keys or tokens to the server
-  const { aiKeys, slackBotToken, ...safe } = settings
   try {
     await fetch(`${SUPABASE_URL}/auth/v1/user`, {
       method: 'PUT',
@@ -53,7 +51,7 @@ async function sbSave(settings, accessToken) {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ data: { eisenhower_settings: safe } }),
+      body: JSON.stringify({ data: { eisenhower_settings: settings } }),
     })
   } catch { /* non-critical */ }
 }
@@ -70,9 +68,6 @@ export function useSettings(accessToken) {
       const merged = {
         ...DEFAULTS,
         ...remote,
-        // sensitive fields never leave the device
-        aiKeys: local.aiKeys ?? {},
-        slackBotToken: local.slackBotToken ?? '',
       }
       lsWrite(merged)
       setSettings(merged)
