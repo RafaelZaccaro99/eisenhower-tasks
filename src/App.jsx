@@ -132,9 +132,13 @@ export default function App() {
         <div className="flex items-center gap-2 md:gap-4">
           <span className="text-sm font-semibold text-notion-text tracking-tight">Eisenhower</span>
           <span className="hidden sm:inline text-xs text-notion-muted">{pending} pendente{pending !== 1 ? 's' : ''}</span>
-          {serverMode && (
+          {serverMode ? (
             <span className="hidden sm:inline text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-md font-medium">
               ⬡ MCP
+            </span>
+          ) : !authLoading && user && (
+            <span className="hidden sm:inline text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md font-medium">
+              ⚡ offline
             </span>
           )}
           {settings.assistantEnabled && (

@@ -85,6 +85,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPerson, setFilterPerson] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
@@ -125,7 +126,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
 
   const findPerson = id => people.find(p => p.id === id)
   const categories = [...new Set(tasks.map(t => t.category).filter(c => c && c !== 'geral'))]
-  const hasFilters = search || filterCategory || filterPerson || !showCompleted || sortBy
+  const hasFilters = search || filterCategory || filterPerson || filterStatus || !showCompleted || sortBy
 
   function applySort(list) {
     if (!sortBy) return list
@@ -157,6 +158,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterCategory && t.category !== filterCategory) return false
       if (filterPerson && t.delegated_to !== filterPerson) return false
+      if (filterStatus && t.status !== filterStatus) return false
       return true
     })
     return applySort(filtered)
@@ -178,7 +180,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   }
 
   function clearFilters() {
-    setSearch(''); setFilterCategory(''); setFilterPerson(''); setShowCompleted(true); setSortBy('')
+    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterStatus(''); setShowCompleted(true); setSortBy('')
   }
 
   const SortSelect = ({ className = '' }) => (
@@ -258,6 +260,13 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
               {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
             </select>
           )}
+          <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
+            value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+            <option value="">Status</option>
+            {['in_progress', 'review', 'blocked'].map(s => (
+              <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>
+            ))}
+          </select>
           <SortSelect className="hidden md:block" />
           <button onClick={() => setShowCompleted(v => !v)}
             className={`hidden md:flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
@@ -301,6 +310,13 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
                 {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
               </select>
             )}
+            <select className="text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none flex-1"
+              value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+              <option value="">Status</option>
+              {['in_progress', 'review', 'blocked'].map(s => (
+                <option key={s} value={s}>{STATUS_CONFIG[s]?.label ?? s}</option>
+              ))}
+            </select>
             <SortSelect className="flex-1" />
             <button onClick={() => setShowCompleted(v => !v)}
               className={`flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${

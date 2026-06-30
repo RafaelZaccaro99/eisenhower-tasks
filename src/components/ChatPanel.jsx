@@ -97,8 +97,13 @@ const SUGGESTIONS = [
   'Criar reunião de equipe amanhã às 10h',
 ]
 
+const CHAT_LS_KEY = 'eisenhower-chat'
+const CHAT_MAX = 50
+
 export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTask, onCreatePerson, onCreateBlock }) {
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(CHAT_LS_KEY) || '[]') } catch { return [] }
+  })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -185,7 +190,11 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
         }
       }
 
-      setMessages(prev => [...prev, ...batch])
+      setMessages(prev => {
+        const next = [...prev, ...batch].slice(-CHAT_MAX)
+        localStorage.setItem(CHAT_LS_KEY, JSON.stringify(next))
+        return next
+      })
     } catch (e) {
       setError(e.message)
       setMessages(prev => prev.slice(0, -1))
@@ -221,7 +230,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose, onCreateTa
           <div className="flex items-center gap-1">
             {messages.length > 0 && (
               <button
-                onClick={() => { setMessages([]); setError(null) }}
+                onClick={() => { setMessages([]); setError(null); localStorage.removeItem(CHAT_LS_KEY) }}
                 title="Limpar conversa"
                 className="p-1.5 text-notion-muted hover:text-notion-sub rounded-md hover:bg-notion-surface transition-colors"
               >
