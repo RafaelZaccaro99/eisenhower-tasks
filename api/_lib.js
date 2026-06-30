@@ -1,10 +1,10 @@
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 
-async function sb(path, method = 'GET', body) {
+async function sb(path, method = 'GET', body, authToken) {
   const headers = {
     'apikey': SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${authToken || SUPABASE_ANON_KEY}`,
     'Content-Type': 'application/json',
   }
   if (method !== 'DELETE') headers['Prefer'] = 'return=representation'

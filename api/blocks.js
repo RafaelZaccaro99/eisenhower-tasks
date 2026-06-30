@@ -3,6 +3,7 @@ const { sb, cors } = require('./_lib')
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
+  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     if (req.method === 'GET') {
@@ -10,7 +11,7 @@ module.exports = async (req, res) => {
       let path = '/blocks?order=date.asc,start_time.asc'
       if (date) path += `&date=eq.${date}`
       else if (start && end) path += `&date=gte.${start}&date=lte.${end}`
-      const rows = await sb(path)
+      const rows = await sb(path, 'GET', undefined, token)
       return res.status(200).json(rows)
     }
 
@@ -28,7 +29,7 @@ module.exports = async (req, res) => {
         recurrence: d.recurrence || null,
         recurrence_end: d.recurrence_end || null,
       }
-      const created = await sb('/blocks', 'POST', row)
+      const created = await sb('/blocks', 'POST', row, token)
       return res.status(201).json(Array.isArray(created) ? created[0] : created)
     }
 

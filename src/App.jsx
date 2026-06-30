@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock } from 'lucide-react'
+import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
 import People from './components/People'
@@ -7,9 +7,11 @@ import Settings from './components/Settings'
 import History from './components/History'
 import TaskModal from './components/TaskModal'
 import Onboarding from './components/Onboarding'
+import AuthScreen from './components/AuthScreen'
 import { useTasks } from './hooks/useTasks'
 import { usePeople } from './hooks/usePeople'
 import { useSettings } from './hooks/useSettings'
+import { useAuth } from './hooks/useAuth'
 
 const VIEWS = [
   { key: 'matrix',   label: 'Matriz',        icon: LayoutGrid   },
@@ -23,6 +25,7 @@ export default function App() {
   const [view, setView] = useState('matrix')
   const [modal, setModal] = useState(null)
 
+  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
   const { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis } = useSettings()
@@ -54,6 +57,18 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [modal, view])
+
+  if (authLoading) {
+    return (
+      <div className="h-[100dvh] flex items-center justify-center text-notion-muted text-sm">
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
+  }
 
   if (!settings.onboardingCompleted) {
     return <Onboarding onComplete={data => saveAnamnesis(data)} />
@@ -116,15 +131,24 @@ export default function App() {
           })}
         </nav>
 
-        {/* Right: new task button */}
-        {showNewButton ? (
-          <button onClick={() => openNew('q2')} className="btn-primary">
-            <Plus size={14} />
-            <span className="hidden sm:inline">Nova tarefa</span>
+        {/* Right side */}
+        <div className="flex items-center gap-2">
+          {showNewButton ? (
+            <button onClick={() => openNew('q2')} className="btn-primary">
+              <Plus size={14} />
+              <span className="hidden sm:inline">Nova tarefa</span>
+            </button>
+          ) : (
+            <div className="hidden md:block w-28" />
+          )}
+          <button
+            onClick={signOut}
+            title={`Sair (${user.email})`}
+            className="text-notion-muted hover:text-notion-text transition-colors p-1.5 rounded-md hover:bg-notion-surface"
+          >
+            <LogOut size={15} />
           </button>
-        ) : (
-          <div className="w-8 md:w-28" />
-        )}
+        </div>
       </header>
 
       {/* Content */}
