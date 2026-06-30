@@ -102,12 +102,12 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: 'rgba(15,15,15,0.4)' }} onClick={onClose}>
       <form
         onSubmit={e => { e.preventDefault(); if (form.title.trim()) onSave(form) }}
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-xl w-full max-w-lg overflow-hidden"
+        className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-lg max-h-[92dvh] overflow-y-auto"
         style={{ boxShadow: '0 8px 40px rgba(15,15,15,0.12), 0 0 0 1px rgba(15,15,15,0.06)' }}
       >
         {/* Title */}

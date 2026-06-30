@@ -330,7 +330,7 @@ export default function Agenda({ tasks }) {
           </h2>
           <p className="text-xs text-notion-muted">{blocks.length} bloco{blocks.length !== 1 ? 's' : ''}</p>
         </div>
-        <button onClick={() => setModal('new')} className="btn-ghost">
+        <button onClick={() => setModal('new')} className="btn-ghost py-2 px-4">
           <Plus size={13} /> Bloco
         </button>
       </div>
