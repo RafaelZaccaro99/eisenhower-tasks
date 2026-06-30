@@ -41,4 +41,8 @@ function requireAuth(req, res) {
   return token
 }
 
-module.exports = { sb, calcQuadrant, cors, requireAuth }
+function getUserId(token) {
+  try { return JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString()).sub } catch { return null }
+}
+
+module.exports = { sb, calcQuadrant, cors, requireAuth, getUserId }

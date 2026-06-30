@@ -1,4 +1,4 @@
-const { sb, cors, requireAuth } = require('./_lib')
+const { sb, cors, requireAuth, getUserId } = require('./_lib')
 
 module.exports = async (req, res) => {
   cors(res)
@@ -19,6 +19,7 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const d = req.body
       const row = {
+        user_id: getUserId(token),
         title: d.title,
         task_id: d.task_id || null,
         date: d.date,
