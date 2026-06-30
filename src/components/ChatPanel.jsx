@@ -65,8 +65,11 @@ async function callAI(messages, systemPrompt, { provider, model, apiKey }) {
       return data.content?.[0]?.text
     }
     case 'openai':
-    case 'groq': {
-      const base = provider === 'groq' ? 'https://api.groq.com/openai' : 'https://api.openai.com'
+    case 'groq':
+    case 'xai': {
+      const base = provider === 'groq' ? 'https://api.groq.com/openai'
+        : provider === 'xai' ? 'https://api.x.ai'
+        : 'https://api.openai.com'
       const res = await fetch(`${base}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },

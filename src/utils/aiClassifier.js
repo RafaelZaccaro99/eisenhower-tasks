@@ -38,6 +38,15 @@ export const PROVIDERS = {
       { id: 'gemini-1.5-pro',     label: 'Gemini 1.5 Pro · melhor' },
     ],
   },
+  xai: {
+    label: 'xAI Grok',
+    keyPlaceholder: 'xai-...',
+    keyHint: 'console.x.ai',
+    models: [
+      { id: 'grok-3-mini',  label: 'Grok 3 Mini · rápido · grátis' },
+      { id: 'grok-2-1212',  label: 'Grok 2 · melhor' },
+    ],
+  },
 }
 
 function buildPrompt(title, dueDate, anamnesis) {
@@ -145,6 +154,9 @@ export async function classifyTaskWithAI(title, dueDate, anamnesis, { provider, 
       break
     case 'groq':
       text = await callOpenAI(prompt, model, apiKey, 'https://api.groq.com/openai')
+      break
+    case 'xai':
+      text = await callOpenAI(prompt, model, apiKey, 'https://api.x.ai')
       break
     case 'google':
       text = await callGemini(prompt, model, apiKey)
