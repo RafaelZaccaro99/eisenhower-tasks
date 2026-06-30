@@ -4,10 +4,10 @@ module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
+  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     const { tasks = [], people = [], blocks = [] } = req.body
-
     const results = { tasks: 0, people: 0, blocks: 0 }
 
     for (const t of tasks) {
@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
         category: t.category || 'geral',
         delegated_to: t.delegated_to || null,
         created_at: t.created_at || new Date().toISOString(),
-      })
+      }, token)
       results.tasks++
     }
 
@@ -37,7 +37,7 @@ module.exports = async (req, res) => {
         slackId: p.slackId || null,
         whatsapp: p.whatsapp || null,
         created_at: p.created_at || new Date().toISOString(),
-      })
+      }, token)
       results.people++
     }
 
@@ -54,7 +54,7 @@ module.exports = async (req, res) => {
         recurrence: b.recurrence || null,
         recurrence_end: b.recurrence_end || null,
         created_at: b.created_at || new Date().toISOString(),
-      })
+      }, token)
       results.blocks++
     }
 

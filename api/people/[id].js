@@ -3,8 +3,8 @@ const { sb, cors } = require('../_lib')
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
-
   const { id } = req.query
+  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     if (req.method === 'PUT') {
@@ -17,12 +17,12 @@ module.exports = async (req, res) => {
         slackId: d.slackId || null,
         whatsapp: d.whatsapp || null,
       }
-      const updated = await sb(`/people?id=eq.${id}`, 'PATCH', patch)
+      const updated = await sb(`/people?id=eq.${id}`, 'PATCH', patch, token)
       return res.status(200).json(Array.isArray(updated) ? updated[0] : updated)
     }
 
     if (req.method === 'DELETE') {
-      await sb(`/people?id=eq.${id}`, 'DELETE')
+      await sb(`/people?id=eq.${id}`, 'DELETE', undefined, token)
       return res.status(200).json({ ok: true })
     }
 

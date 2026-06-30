@@ -3,10 +3,11 @@ const { sb, cors } = require('./_lib')
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
+  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     if (req.method === 'GET') {
-      const rows = await sb('/people?order=created_at.asc')
+      const rows = await sb('/people?order=created_at.asc', 'GET', undefined, token)
       return res.status(200).json(rows)
     }
 
@@ -21,7 +22,7 @@ module.exports = async (req, res) => {
         slackId: d.slackId || null,
         whatsapp: d.whatsapp || null,
       }
-      const created = await sb('/people', 'POST', row)
+      const created = await sb('/people', 'POST', row, token)
       return res.status(201).json(Array.isArray(created) ? created[0] : created)
     }
 

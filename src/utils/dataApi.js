@@ -1,7 +1,7 @@
-// Client for the local data server (localhost:3001 proxied via /api)
-// Falls back to localStorage if the server is not running.
-
 let _serverUp = null
+let _authToken = null
+
+export function setAuthToken(token) { _authToken = token }
 
 export async function isServerUp() {
   if (_serverUp !== null) return _serverUp
@@ -14,19 +14,22 @@ export async function isServerUp() {
   return _serverUp
 }
 
-// Reset cached status (called after server errors to retry)
 export function resetServerStatus() { _serverUp = null }
 
 async function call(path, method = 'GET', body) {
+  const headers = {}
+  if (body) headers['Content-Type'] = 'application/json'
+  if (_authToken) headers['Authorization'] = `Bearer ${_authToken}`
   const res = await fetch(`/api${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
     resetServerStatus()
     throw new Error(`HTTP ${res.status}`)
   }
+  if (method === 'DELETE' || res.status === 204) return { ok: true }
   return res.json()
 }
 
@@ -49,5 +52,9 @@ export const dataApi = {
     update: (id, body) => call(`/blocks/${id}`, 'PUT',    body),
     delete: (id)       => call(`/blocks/${id}`, 'DELETE'),
   },
-  sync: (tasks, people) => call('/sync', 'POST', { tasks, people }),
+  sync: (tasks, people, blocks) => call('/sync', 'POST', {
+    tasks: tasks || [],
+    people: people || [],
+    blocks: blocks || [],
+  }),
 }

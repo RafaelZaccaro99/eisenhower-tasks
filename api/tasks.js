@@ -3,10 +3,11 @@ const { sb, calcQuadrant, cors } = require('./_lib')
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
+  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     if (req.method === 'GET') {
-      const rows = await sb('/tasks?order=created_at.asc')
+      const rows = await sb('/tasks?order=created_at.asc', 'GET', undefined, token)
       return res.status(200).json(rows)
     }
 
@@ -24,7 +25,7 @@ module.exports = async (req, res) => {
         category: d.category || 'geral',
         delegated_to: d.delegated_to || null,
       }
-      const created = await sb('/tasks', 'POST', row)
+      const created = await sb('/tasks', 'POST', row, token)
       return res.status(201).json(Array.isArray(created) ? created[0] : created)
     }
 
