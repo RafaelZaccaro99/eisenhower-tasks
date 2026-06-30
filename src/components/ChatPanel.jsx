@@ -124,7 +124,9 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
   }, [messages, loading])
 
   useEffect(() => {
-    setTimeout(() => inputRef.current?.focus(), 150)
+    if (window.matchMedia('(hover: hover)').matches) {
+      setTimeout(() => inputRef.current?.focus(), 150)
+    }
   }, [])
 
   async function send() {
@@ -247,7 +249,10 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
         </div>
 
         {/* Input */}
-        <div className="px-4 pb-4 pt-2 border-t border-notion-border flex-shrink-0">
+        <div
+          className="px-4 pt-2 border-t border-notion-border flex-shrink-0"
+          style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+        >
           <div className="flex gap-2 items-end">
             <textarea
               ref={inputRef}
@@ -271,7 +276,7 @@ export default function ChatPanel({ tasks, people, aiConfig, onClose }) {
               <Send size={14} />
             </button>
           </div>
-          <p className="text-[10px] text-notion-muted mt-1.5">Enter para enviar · Shift+Enter para quebrar linha</p>
+          <p className="hidden sm:block text-[10px] text-notion-muted mt-1.5">Enter para enviar · Shift+Enter para quebrar linha</p>
         </div>
       </div>
     </div>
