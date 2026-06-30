@@ -31,7 +31,7 @@ function SlackIcon({ size = 14 }) {
 function PersonModal({ person, onSave, onClose }) {
   const isEdit = !!person?.id
   const [form, setForm] = useState({
-    name: '', role: '', sector: '', hierarchy: 'Subordinado',
+    name: '', role: '', sector: '', hierarchy: '',
     slackId: '', whatsapp: '',
     ...person,
   })
@@ -80,6 +80,7 @@ function PersonModal({ person, onSave, onClose }) {
             <div>
               <label className="label">Hierarquia</label>
               <select className="input" value={form.hierarchy} onChange={e => set('hierarchy', e.target.value)}>
+                <option value="">— selecionar —</option>
                 {HIERARQUIAS.map(h => <option key={h} value={h}>{h}</option>)}
               </select>
             </div>
