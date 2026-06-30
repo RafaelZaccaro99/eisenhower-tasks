@@ -170,24 +170,17 @@ export default function App() {
           ) : (
             <div className="hidden md:block w-28" />
           )}
-          {aiReady && (
-            <button
-              onClick={() => setChatOpen(v => !v)}
-              title="Chat com IA"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                chatOpen
-                  ? 'bg-amber-50 text-amber-600'
-                  : 'text-notion-muted hover:bg-notion-surface hover:text-notion-sub'
-              }`}
-            >
-              <MessageCircle size={15} />
-              <span className="hidden sm:inline text-xs">IA</span>
-            </button>
-          )}
-          <div className="flex items-center gap-1.5 pl-1">
+          <div className="flex items-center gap-1 pl-1">
             <span className="hidden sm:inline text-xs text-notion-muted max-w-[140px] truncate">
               {user.user_metadata?.name || user.email}
             </span>
+            <button
+              onClick={() => setView('settings')}
+              title="Configurações"
+              className={`text-notion-muted hover:text-notion-text transition-colors p-1.5 rounded-md hover:bg-notion-surface flex-shrink-0 ${view === 'settings' ? 'text-notion-text bg-notion-hover' : ''}`}
+            >
+              <SettingsIcon size={15} />
+            </button>
             <button
               onClick={signOut}
               title={`Sair (${user.email})`}
@@ -263,6 +256,21 @@ export default function App() {
           onSave={handleSave}
           onClose={() => setModal(null)}
         />
+      )}
+
+      {/* AI floating action button */}
+      {aiReady && (
+        <button
+          onClick={() => setChatOpen(v => !v)}
+          title="Assistente IA"
+          className={`fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
+            chatOpen
+              ? 'bg-amber-500 text-white shadow-amber-200 scale-95'
+              : 'bg-white border border-notion-border text-notion-muted hover:text-amber-500 hover:border-amber-300 hover:shadow-amber-100 hover:scale-105'
+          }`}
+        >
+          <MessageCircle size={20} />
+        </button>
       )}
 
       {chatOpen && aiReady && (

@@ -230,39 +230,37 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
             </div>
           </div>
 
-          {/* Delegar para (Q3) */}
-          {q === 'q3' && (
-            <div>
-              <p className="label mb-1">Delegar para</p>
-              <select className="input" value={form.delegated_to || ''} onChange={e => set('delegated_to', e.target.value)}>
-                <option value="">— selecionar pessoa —</option>
-                {people.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}{p.role ? ` · ${p.role}` : ''}</option>
-                ))}
-              </select>
-              {people.length === 0 && (
-                <p className="text-xs text-notion-muted mt-1">Cadastre pessoas na aba "Pessoas" primeiro.</p>
-              )}
+          {/* Delegar para */}
+          <div>
+            <p className="label mb-1">Delegar para</p>
+            <select className="input" value={form.delegated_to || ''} onChange={e => set('delegated_to', e.target.value)}>
+              <option value="">— selecionar pessoa —</option>
+              {people.map(p => (
+                <option key={p.id} value={p.id}>{p.name}{p.role ? ` · ${p.role}` : ''}</option>
+              ))}
+            </select>
+            {people.length === 0 && (
+              <p className="text-xs text-notion-muted mt-1">Cadastre pessoas na aba "Pessoas" primeiro.</p>
+            )}
 
-              {/* Slack notification checkbox */}
-              {canNotifySlack && (
-                <label className="flex items-center gap-2 mt-2 cursor-pointer group">
-                  <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
-                    notifySlack ? 'bg-notion-text border-notion-text' : 'border-notion-border2 group-hover:border-notion-sub'
-                  }`} onClick={() => setNotifySlack(v => !v)}>
-                    {notifySlack && <Check size={10} strokeWidth={3} className="text-white" />}
-                  </span>
-                  <span className="text-xs text-notion-sub flex items-center gap-1">
-                    <MessageSquare size={11} />
-                    Notificar {delegatee?.name?.split(' ')[0]} via Slack
-                    {slackStatus === 'sending' && <Loader2 size={10} className="animate-spin ml-1" />}
-                    {slackStatus === 'sent' && <span className="text-green-500 ml-1">enviado</span>}
-                    {slackStatus === 'error' && <span className="text-red-400 ml-1">falhou</span>}
-                  </span>
-                </label>
-              )}
-            </div>
-          )}
+            {/* Slack notification checkbox — only when q3 and Slack is configured */}
+            {canNotifySlack && (
+              <label className="flex items-center gap-2 mt-2 cursor-pointer group">
+                <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                  notifySlack ? 'bg-notion-text border-notion-text' : 'border-notion-border2 group-hover:border-notion-sub'
+                }`} onClick={() => setNotifySlack(v => !v)}>
+                  {notifySlack && <Check size={10} strokeWidth={3} className="text-white" />}
+                </span>
+                <span className="text-xs text-notion-sub flex items-center gap-1">
+                  <MessageSquare size={11} />
+                  Notificar {delegatee?.name?.split(' ')[0]} via Slack
+                  {slackStatus === 'sending' && <Loader2 size={10} className="animate-spin ml-1" />}
+                  {slackStatus === 'sent' && <span className="text-green-500 ml-1">enviado</span>}
+                  {slackStatus === 'error' && <span className="text-red-400 ml-1">falhou</span>}
+                </span>
+              </label>
+            )}
+          </div>
 
           {/* Prazo + Categoria */}
           <div className="grid grid-cols-2 gap-3">
