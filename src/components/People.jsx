@@ -233,18 +233,32 @@ export default function People({ people, tasks = [], slackBotToken = '', onCreat
             </button>
           </div>
         ) : (
-          HIERARQUIAS.map(hier => {
-            const group = byHierarchy(hier)
-            if (group.length === 0) return null
-            return (
-              <div key={hier} className="mb-4">
-                <p className="text-xs font-medium text-notion-muted px-4 mb-1 uppercase tracking-wide">{hier}</p>
-                {group.map(p => (
-                  <PersonCard key={p.id} person={p} onEdit={p => setModal(p)} onDelete={onDelete} onSlack={setSlackTarget} />
-                ))}
-              </div>
-            )
-          })
+          <>
+            {HIERARQUIAS.map(hier => {
+              const group = byHierarchy(hier)
+              if (group.length === 0) return null
+              return (
+                <div key={hier} className="mb-4">
+                  <p className="text-xs font-medium text-notion-muted px-4 mb-1 uppercase tracking-wide">{hier}</p>
+                  {group.map(p => (
+                    <PersonCard key={p.id} person={p} onEdit={p => setModal(p)} onDelete={onDelete} onSlack={setSlackTarget} />
+                  ))}
+                </div>
+              )
+            })}
+            {(() => {
+              const ungrouped = filtered.filter(p => !p.hierarchy || !HIERARQUIAS.includes(p.hierarchy))
+              if (ungrouped.length === 0) return null
+              return (
+                <div className="mb-4">
+                  <p className="text-xs font-medium text-notion-muted px-4 mb-1 uppercase tracking-wide">Sem hierarquia</p>
+                  {ungrouped.map(p => (
+                    <PersonCard key={p.id} person={p} onEdit={p => setModal(p)} onDelete={onDelete} onSlack={setSlackTarget} />
+                  ))}
+                </div>
+              )
+            })()}
+          </>
         )}
       </div>
 
