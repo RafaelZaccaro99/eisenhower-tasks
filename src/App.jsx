@@ -64,22 +64,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [modal, view])
 
-  if (authLoading) {
-    return (
-      <div className="h-[100dvh] flex items-center justify-center text-notion-muted text-sm">
-        Carregando...
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
-  }
-
-  if (!settings.onboardingCompleted) {
-    return <Onboarding onComplete={data => saveAnamnesis(data)} />
-  }
-
   const createBlock = useCallback(async (data) => {
     const block = { id: uuidv4(), recurrence: 'none', recurrence_end: '', color: '#60a5fa', locked: false, task_id: '', ...data }
     const ipc = window.api?.agenda
@@ -95,6 +79,22 @@ export default function App() {
       localStorage.setItem('eisenhower-blocks', JSON.stringify([...all, block]))
     }
   }, [])
+
+  if (authLoading) {
+    return (
+      <div className="h-[100dvh] flex items-center justify-center text-notion-muted text-sm">
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
+  }
+
+  if (!settings.onboardingCompleted) {
+    return <Onboarding onComplete={data => saveAnamnesis(data)} />
+  }
 
   function openNew(defaultQuadrant) {
     const presets = {
