@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut } from 'lucide-react'
+import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut, MessageCircle } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
 import People from './components/People'
 import Settings from './components/Settings'
 import History from './components/History'
 import TaskModal from './components/TaskModal'
+import ChatPanel from './components/ChatPanel'
 import Onboarding from './components/Onboarding'
 import AuthScreen from './components/AuthScreen'
 import { useTasks } from './hooks/useTasks'
@@ -24,6 +25,7 @@ const VIEWS = [
 export default function App() {
   const [view, setView] = useState('matrix')
   const [modal, setModal] = useState(null)
+  const [chatOpen, setChatOpen] = useState(false)
 
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
   const { tasks, loading, serverMode, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
@@ -92,6 +94,13 @@ export default function App() {
 
   const pending = tasks.filter(t => t.status !== 'completed').length
   const showNewButton = view !== 'people' && view !== 'settings' && view !== 'history'
+  const aiConfig = {
+    enabled:  settings.aiEnabled,
+    provider: settings.aiProvider  || 'anthropic',
+    model:    settings.aiModel     || 'claude-haiku-4-5',
+    apiKey:   (settings.aiKeys     || {})[settings.aiProvider] || '',
+  }
+  const aiReady = settings.aiEnabled && !!aiConfig.apiKey
 
   return (
     <div className="h-[100dvh] flex flex-col bg-white overflow-hidden">
@@ -140,6 +149,20 @@ export default function App() {
             </button>
           ) : (
             <div className="hidden md:block w-28" />
+          )}
+          {aiReady && (
+            <button
+              onClick={() => setChatOpen(v => !v)}
+              title="Chat com IA"
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                chatOpen
+                  ? 'bg-amber-50 text-amber-600'
+                  : 'text-notion-muted hover:bg-notion-surface hover:text-notion-sub'
+              }`}
+            >
+              <MessageCircle size={15} />
+              <span className="hidden sm:inline text-xs">IA</span>
+            </button>
           )}
           <div className="flex items-center gap-1.5 pl-1">
             <span className="hidden sm:inline text-xs text-notion-muted max-w-[140px] truncate">
@@ -214,15 +237,19 @@ export default function App() {
           task={modal.task}
           people={people}
           assistantEnabled={settings.assistantEnabled}
-          aiConfig={{
-            enabled:  settings.aiEnabled,
-            provider: settings.aiProvider  || 'anthropic',
-            model:    settings.aiModel     || 'claude-haiku-4-5',
-            apiKey:   (settings.aiKeys     || {})[settings.aiProvider] || '',
-          }}
+          aiConfig={aiConfig}
           anamnesis={settings.anamnesis}
           onSave={handleSave}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {chatOpen && aiReady && (
+        <ChatPanel
+          tasks={tasks}
+          people={people}
+          aiConfig={aiConfig}
+          onClose={() => setChatOpen(false)}
         />
       )}
     </div>
