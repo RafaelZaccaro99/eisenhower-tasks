@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { Check, Plus, Trash2, User, Search, X, Eye, EyeOff, SlidersHorizontal, RefreshCw, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -82,8 +82,34 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   const [showFilters, setShowFilters] = useState(false)
   const [dragOverKey, setDragOverKey] = useState(null)
   const [mobileQ, setMobileQ] = useState('q1')
+  const [colPct, setColPct] = useState(() => Number(localStorage.getItem('matrix-col-pct') || 50))
+  const [rowPct, setRowPct] = useState(() => Number(localStorage.getItem('matrix-row-pct') || 50))
   const dragTask = useRef(null)
   const searchRef = useRef(null)
+  const gridRef = useRef(null)
+
+  useEffect(() => { localStorage.setItem('matrix-col-pct', colPct) }, [colPct])
+  useEffect(() => { localStorage.setItem('matrix-row-pct', rowPct) }, [rowPct])
+
+  function startDrag(e, type) {
+    e.preventDefault()
+    const rect = gridRef.current.getBoundingClientRect()
+    function onMove(ev) {
+      if (type === 'col') {
+        const pct = ((ev.clientX - rect.left) / rect.width) * 100
+        setColPct(Math.max(20, Math.min(80, pct)))
+      } else {
+        const pct = ((ev.clientY - rect.top) / rect.height) * 100
+        setRowPct(Math.max(20, Math.min(80, pct)))
+      }
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
 
   if (typeof window !== 'undefined') {
     window.__matrixFocusSearch = () => searchRef.current?.focus()
@@ -330,14 +356,15 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
         })()}
       </div>
 
-      {/* DESKTOP: 2×2 grid */}
-      <div className="hidden md:grid flex-1 min-h-0 grid-cols-2 grid-rows-2 divide-x divide-y divide-notion-border overflow-hidden">
-        {QUADRANTS.map(q => {
+      {/* DESKTOP: resizable 2×2 layout */}
+      {(() => {
+        function DesktopQuadrant({ q, style }) {
           const pending = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed').length
           const overdue = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed' && t.due_date && t.due_date < TODAY).length
           const isDropTarget = dragOverKey === q.key
           return (
-            <div key={q.key}
+            <div
+              style={style}
               className={`flex flex-col min-h-0 overflow-hidden transition-colors duration-100 ${isDropTarget ? 'bg-blue-50/50' : ''}`}
               onDragOver={e => { e.preventDefault(); setDragOverKey(q.key) }}
               onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDragOverKey(null) }}
@@ -345,9 +372,9 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
             >
               <div className="flex items-center justify-between px-5 pt-4 pb-2 flex-shrink-0">
                 <div className="flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${q.dot}`} />
+                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${q.dot}`} />
                   <div>
-                    <h3 className="text-sm font-semibold text-notion-text leading-tight">{q.label}</h3>
+                    <h3 className="text-base font-semibold text-notion-text leading-tight">{q.label}</h3>
                     <p className="text-xs text-notion-muted">{q.sub}</p>
                   </div>
                 </div>
@@ -368,8 +395,39 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
               </div>
             </div>
           )
-        })}
-      </div>
+        }
+
+        const colDivider = (
+          <div
+            className="w-[6px] cursor-col-resize flex-shrink-0 bg-notion-border/40 hover:bg-blue-300/70 active:bg-blue-400 transition-colors"
+            onMouseDown={e => startDrag(e, 'col')}
+            title="Arraste para redimensionar"
+          />
+        )
+        const rowDivider = (
+          <div
+            className="h-[6px] cursor-row-resize flex-shrink-0 bg-notion-border/40 hover:bg-blue-300/70 active:bg-blue-400 transition-colors"
+            onMouseDown={e => startDrag(e, 'row')}
+            title="Arraste para redimensionar"
+          />
+        )
+
+        return (
+          <div ref={gridRef} className="hidden md:flex flex-col flex-1 min-h-0 overflow-hidden">
+            <div className="flex min-h-0 overflow-hidden" style={{ height: `${rowPct}%` }}>
+              <DesktopQuadrant q={QUADRANTS[0]} style={{ width: `${colPct}%`, borderRight: '1px solid #e9e9e7' }} />
+              {colDivider}
+              <DesktopQuadrant q={QUADRANTS[1]} style={{ flex: 1 }} />
+            </div>
+            {rowDivider}
+            <div className="flex flex-1 min-h-0 overflow-hidden">
+              <DesktopQuadrant q={QUADRANTS[2]} style={{ width: `${colPct}%`, borderRight: '1px solid #e9e9e7' }} />
+              {colDivider}
+              <DesktopQuadrant q={QUADRANTS[3]} style={{ flex: 1 }} />
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
