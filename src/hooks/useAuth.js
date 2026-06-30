@@ -86,5 +86,5 @@ export function useAuth() {
     applySession(null)
   }, [session, applySession])
 
-  return { user: session?.user || null, loading, signIn, signUp, signOut }
+  return { user: session?.user || null, accessToken: session?.access_token || null, loading, signIn, signUp, signOut }
 }
