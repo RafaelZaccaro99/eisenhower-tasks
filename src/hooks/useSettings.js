@@ -89,17 +89,13 @@ export function useSettings(accessToken) {
     if (accessToken) sbSave(stripSecrets(next), accessToken)
   }, [accessToken])
 
-  const saveAnamnesis = useCallback((anamnesisPatch) => {
+  const saveAnamnesis = useCallback((anamnesisPatch, overrides = {}) => {
     const current = lsRead()
-    const { __aiProvider, __aiModel, __aiKeys, __slackBotToken, ...rest } = anamnesisPatch
     const next = {
       ...current,
-      anamnesis: { ...current.anamnesis, ...rest },
+      anamnesis: { ...current.anamnesis, ...anamnesisPatch },
       onboardingCompleted: true,
-      ...(typeof __aiProvider    !== 'undefined' ? { aiProvider:    __aiProvider    } : {}),
-      ...(typeof __aiModel       !== 'undefined' ? { aiModel:       __aiModel       } : {}),
-      ...(typeof __aiKeys        !== 'undefined' ? { aiKeys:        __aiKeys        } : {}),
-      ...(typeof __slackBotToken !== 'undefined' ? { slackBotToken: __slackBotToken } : {}),
+      ...overrides,
     }
     lsWrite(next)
     setSettings(next)

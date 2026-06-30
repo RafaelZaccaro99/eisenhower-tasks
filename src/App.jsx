@@ -220,9 +220,14 @@ export default function App() {
         ) : (
           <Settings
             settings={settings}
-            onSave={patch => {
-              if ('assistantEnabled' in patch || 'aiEnabled' in patch) save(patch)
-              else saveAnamnesis(patch)
+            onSave={(patch, overrides) => {
+              if (overrides !== undefined) {
+                saveAnamnesis(patch, overrides)
+              } else if ('assistantEnabled' in patch || 'aiEnabled' in patch) {
+                save(patch)
+              } else {
+                saveAnamnesis(patch)
+              }
             }}
             onRestartOnboarding={() => save({ onboardingCompleted: false })}
           />

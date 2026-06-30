@@ -17,3 +17,10 @@ export const STATUS_TRANSITIONS = {
 }
 
 export const DONE_STATUSES = ['completed', 'cancelled']
+
+export function calcQuadrant(urgent, important) {
+  if (urgent && important) return 'q1'
+  if (!urgent && important) return 'q2'
+  if (urgent && !important) return 'q3'
+  return 'q4'
+}

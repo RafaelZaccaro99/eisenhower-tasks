@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { isServerUp, dataApi } from '../utils/dataApi'
-
-function calcQuadrant(urgent, important) {
-  if (urgent && important) return 'q1'
-  if (!urgent && important) return 'q2'
-  if (urgent && !important) return 'q3'
-  return 'q4'
-}
+import { calcQuadrant } from '../utils/statusConfig'
 
 function nextDueDate(dueDate, recurrence) {
   const d = new Date(dueDate + 'T00:00:00')
@@ -62,7 +56,8 @@ export function useTasks() {
           const lsTasks = lsRead()
           if (lsTasks.length > 0) {
             try {
-              await dataApi.sync(lsTasks, null)
+              const lsBlocks = JSON.parse(localStorage.getItem('eisenhower-blocks') || '[]')
+              await dataApi.sync(lsTasks, null, lsBlocks)
               const afterSync = await dataApi.tasks.list()
               setTasks(afterSync.length > 0 ? afterSync : lsTasks)
             } catch {

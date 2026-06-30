@@ -54,9 +54,3 @@ export function buildBlocks(message, task) {
   return blocks
 }
 
-export function taskQuadrant(task) {
-  if (task.urgent && task.important) return 'q1'
-  if (!task.urgent && task.important) return 'q2'
-  if (task.urgent && !task.important) return 'q3'
-  return 'q4'
-}

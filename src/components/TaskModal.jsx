@@ -3,7 +3,7 @@ import { X, Check, Zap, ZapOff, ChevronDown, Loader2, RefreshCw, MessageSquare }
 import { classifyTask, quadrantLabel } from '../utils/classifier'
 import { classifyTaskWithAI } from '../utils/aiClassifier'
 import { sendSlackMessage, buildBlocks } from '../utils/slack'
-import { STATUS_CONFIG, STATUS_TRANSITIONS } from '../utils/statusConfig'
+import { STATUS_CONFIG, STATUS_TRANSITIONS, calcQuadrant } from '../utils/statusConfig'
 
 const CATEGORIES = ['geral', 'trabalho', 'pessoal', 'saúde', 'financeiro', 'estudo']
 const RECURRENCES = [
@@ -27,12 +27,6 @@ const Q_SUGGESTION_STYLE = {
   q4: 'border-notion-border bg-notion-surface text-notion-sub',
 }
 
-function calcQ(urgent, important) {
-  if (urgent && important) return 'q1'
-  if (!urgent && important) return 'q2'
-  if (urgent && !important) return 'q3'
-  return 'q4'
-}
 
 function Toggle({ label, active, onClick, activeClass }) {
   return (
@@ -71,7 +65,7 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const q = calcQ(form.urgent, form.important)
+  const q = calcQuadrant(form.urgent, form.important)
   const qInfo = Q_LABELS[q]
 
   const delegatee = form.delegated_to ? people.find(p => p.id === form.delegated_to) : null

@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useMemo } from 'react'
+import { DONE_STATUSES } from '../utils/statusConfig'
 
 const LS_KEY = 'eisenhower-notified'
 
@@ -22,7 +23,7 @@ export function useNotifications(tasks, loading) {
 
   const overdueIds = useMemo(
     () => tasks
-      .filter(t => t.status !== 'completed' && t.due_date && t.due_date < today)
+      .filter(t => !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < today)
       .map(t => t.id),
     [tasks, today]
   )
@@ -36,7 +37,7 @@ export function useNotifications(tasks, loading) {
   useEffect(() => {
     if (loading || !tasks.length) return
 
-    const pending = tasks.filter(t => t.status !== 'completed')
+    const pending = tasks.filter(t => !DONE_STATUSES.includes(t.status))
     const toNotify = pending.filter(t => {
       if (!t.due_date) return false
       const overdue = t.due_date < today

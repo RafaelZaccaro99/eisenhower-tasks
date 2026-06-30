@@ -11,13 +11,12 @@ const QUADRANTS = [
   { key: 'q4', label: 'Eliminar',     sub: 'Não urgente · Não importante', dot: 'bg-notion-border2', chip: 'bg-notion-surface text-notion-muted', urgent: false, important: false },
 ]
 
-const TODAY = new Date().toISOString().split('T')[0]
-
 function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
+  const today = new Date().toISOString().split('T')[0]
   const done = task.status === 'completed'
   const isCancelled = task.status === 'cancelled'
-  const isOverdue = !done && !isCancelled && task.due_date && task.due_date < TODAY
-  const isDueToday = !done && !isCancelled && task.due_date === TODAY
+  const isOverdue = !done && !isCancelled && task.due_date && task.due_date < today
+  const isDueToday = !done && !isCancelled && task.due_date === today
   const hasRecurrence = task.recurrence && task.recurrence !== 'none'
   const statusCfg = STATUS_CONFIG[task.status]
 
@@ -82,6 +81,7 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
 }
 
 export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, onToggle, onMoveTask }) {
+  const today = new Date().toISOString().split('T')[0]
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPerson, setFilterPerson] = useState('')
@@ -323,7 +323,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
         <div className="flex flex-shrink-0 border-b border-notion-border">
           {QUADRANTS.map(q => {
             const pending = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status)).length
-            const overdue = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < TODAY).length
+            const overdue = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < today).length
             const active = mobileQ === q.key
             return (
               <button key={q.key} onClick={() => setMobileQ(q.key)}
@@ -368,7 +368,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       {(() => {
         function DesktopQuadrant({ q, style }) {
           const pending = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status)).length
-          const overdue = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < TODAY).length
+          const overdue = tasks.filter(t => t.quadrant === q.key && !DONE_STATUSES.includes(t.status) && t.due_date && t.due_date < today).length
           const isDropTarget = dragOverKey === q.key
           return (
             <div
