@@ -27,7 +27,8 @@ async function call(path, method = 'GET', body) {
   })
   if (!res.ok) {
     resetServerStatus()
-    throw new Error(`HTTP ${res.status}`)
+    const errBody = await res.json().catch(() => ({}))
+    throw new Error(errBody.error || `HTTP ${res.status}`)
   }
   if (method === 'DELETE' || res.status === 204) return { ok: true }
   return res.json()
