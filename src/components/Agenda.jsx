@@ -56,12 +56,12 @@ function BlockModal({ date, tasks, initialBlock, onSave, onUpdate, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: 'rgba(15,15,15,0.4)' }} onClick={onClose}>
       <form
         onSubmit={handleSubmit}
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-xl w-full max-w-sm overflow-hidden"
+        className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-sm max-h-[92dvh] overflow-y-auto"
         style={{ boxShadow: '0 8px 40px rgba(15,15,15,0.12), 0 0 0 1px rgba(15,15,15,0.06)' }}
       >
         <div className="px-5 pt-4 pb-3 border-b border-notion-border flex items-center justify-between">

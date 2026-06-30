@@ -39,14 +39,14 @@ function PersonModal({ person, onSave, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       style={{ background: 'rgba(15,15,15,0.4)' }}
       onClick={onClose}
     >
       <form
         onSubmit={e => { e.preventDefault(); if (form.name.trim()) onSave(form) }}
         onClick={e => e.stopPropagation()}
-        className="bg-white rounded-xl w-full max-w-md overflow-hidden"
+        className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md max-h-[92dvh] overflow-y-auto"
         style={{ boxShadow: '0 8px 40px rgba(15,15,15,0.12), 0 0 0 1px rgba(15,15,15,0.06)' }}
       >
         <div className="px-6 pt-5 pb-3 border-b border-notion-border flex items-center justify-between">
@@ -164,7 +164,7 @@ function PersonCard({ person, onEdit, onDelete, onSlack }) {
       <span className={`chip text-xs ${HIER_STYLE[person.hierarchy] || 'bg-notion-surface text-notion-muted'}`}>
         {person.hierarchy}
       </span>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
         <button onClick={() => onEdit(person)} className="btn-ghost p-1.5"><Pencil size={13} /></button>
         <button onClick={() => onDelete(person.id)} className="btn-danger p-1.5"><Trash2 size={13} /></button>
       </div>
@@ -193,20 +193,20 @@ export default function People({ people, tasks = [], slackBotToken = '', onCreat
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-notion-border flex-shrink-0">
-        <div>
+      <div className="flex items-center justify-between gap-2 px-4 md:px-6 py-4 border-b border-notion-border flex-shrink-0">
+        <div className="flex-shrink-0">
           <h2 className="text-sm font-semibold text-notion-text">Pessoas</h2>
           <p className="text-xs text-notion-muted">{people.length} cadastrada{people.length !== 1 ? 's' : ''}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1 justify-end">
           <input
-            className="input w-48 text-xs"
+            className="input text-xs flex-1 max-w-[180px]"
             placeholder="Buscar..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          <button onClick={() => setModal({})} className="btn-primary">
-            <Plus size={14} /> Pessoa
+          <button onClick={() => setModal({})} className="btn-primary flex-shrink-0">
+            <Plus size={14} /> <span className="hidden sm:inline">Pessoa</span>
           </button>
         </div>
       </div>

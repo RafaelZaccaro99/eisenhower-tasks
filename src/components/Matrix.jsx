@@ -51,7 +51,7 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
 
       <button
         onClick={e => { e.stopPropagation(); onDelete(task.id) }}
-        className="opacity-0 group-hover:opacity-100 flex-shrink-0 text-notion-muted hover:text-red-400 transition-all p-0.5"
+        className="md:opacity-0 md:group-hover:opacity-100 flex-shrink-0 text-notion-muted hover:text-red-400 transition-all p-0.5"
       >
         <Trash2 size={13} />
       </button>
