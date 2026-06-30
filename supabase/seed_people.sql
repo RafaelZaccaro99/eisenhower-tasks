@@ -8,6 +8,9 @@ BEGIN
     RAISE EXCEPTION 'Usuário não encontrado: rafaelfernandozaccaro@gmail.com — faça login no app primeiro';
   END IF;
 
+  -- Desabilita trigger para preservar o user_id explícito
+  ALTER TABLE people DISABLE TRIGGER set_user_id_people;
+
   INSERT INTO people (name, "slackId", user_id) VALUES
     ('Fellipe Mengue',         'U0AS6LJRK4M', uid),
     ('Caio Pazin',             'U0ASDJYUB0U', uid),
@@ -60,6 +63,9 @@ BEGIN
     ('Gabriel Pazin',          'U0BCQFHC4AU', uid),
     ('Ícaro Camillo',          'U0BDN6J6WTC', uid)
   ON CONFLICT DO NOTHING;
+
+  -- Reabilita trigger
+  ALTER TABLE people ENABLE TRIGGER set_user_id_people;
 
   RAISE NOTICE 'Cadastro concluído: 50 pessoas inseridas para %', uid;
 END $$;
