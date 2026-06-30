@@ -24,26 +24,30 @@ export function useTasks() {
   const [serverMode, setServerMode] = useState(false)
 
   const load = useCallback(async () => {
-    if (ipc) {
-      const all = await ipc.getAll()
-      setTasks(all.map(t => ({ ...t, urgent: !!t.urgent, important: !!t.important })))
-      setLoading(false)
-      return
-    }
-    const up = await isServerUp()
-    setServerMode(up)
-    if (up) {
-      // First boot: sync localStorage → server if server is empty
-      const serverTasks = await dataApi.tasks.list()
-      if (serverTasks.length === 0) {
-        const lsTasks = lsRead()
-        if (lsTasks.length > 0) await dataApi.sync(lsTasks, null)
+    try {
+      if (ipc) {
+        const all = await ipc.getAll()
+        setTasks(all.map(t => ({ ...t, urgent: !!t.urgent, important: !!t.important })))
+        return
       }
-      setTasks(await dataApi.tasks.list())
-    } else {
+      const up = await isServerUp()
+      setServerMode(up)
+      if (up) {
+        const serverTasks = await dataApi.tasks.list()
+        if (serverTasks.length === 0) {
+          const lsTasks = lsRead()
+          if (lsTasks.length > 0) await dataApi.sync(lsTasks, null)
+        }
+        setTasks(await dataApi.tasks.list())
+      } else {
+        setTasks(lsRead())
+      }
+    } catch {
+      setServerMode(false)
       setTasks(lsRead())
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   useEffect(() => { load() }, [load])
