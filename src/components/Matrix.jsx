@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react'
-import { Check, Plus, Trash2, User, Search, X, Eye, EyeOff, SlidersHorizontal } from 'lucide-react'
+import { Check, Plus, Trash2, User, Search, X, Eye, EyeOff, SlidersHorizontal, RefreshCw, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -10,8 +10,14 @@ const QUADRANTS = [
   { key: 'q4', label: 'Eliminar',     sub: 'Não urgente · Não importante', dot: 'bg-notion-border2', chip: 'bg-notion-surface text-notion-muted', urgent: false, important: false },
 ]
 
+const TODAY = new Date().toISOString().split('T')[0]
+
 function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
   const done = task.status === 'completed'
+  const isOverdue = !done && task.due_date && task.due_date < TODAY
+  const isDueToday = !done && task.due_date === TODAY
+  const hasRecurrence = task.recurrence && task.recurrence !== 'none'
+
   return (
     <div
       className="task-row group cursor-grab active:cursor-grabbing select-none"
@@ -29,13 +35,21 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
       </button>
 
       <div className="flex-1 min-w-0">
-        <span className={`text-sm leading-5 ${done ? 'line-through text-notion-muted' : 'text-notion-text'}`}>
-          {task.title}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-sm leading-5 ${done ? 'line-through text-notion-muted' : 'text-notion-text'}`}>
+            {task.title}
+          </span>
+          {isOverdue && <AlertCircle size={12} className="flex-shrink-0 text-red-400" />}
+          {hasRecurrence && <RefreshCw size={10} className="flex-shrink-0 text-blue-400" />}
+        </div>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           {task.due_date && (
-            <span className="text-xs text-notion-muted">
+            <span className={`text-xs font-medium ${
+              isOverdue ? 'text-red-500' : isDueToday ? 'text-amber-500' : 'text-notion-muted'
+            }`}>
               {format(new Date(task.due_date + 'T00:00:00'), "d MMM", { locale: ptBR })}
+              {isOverdue && ' · atrasada'}
+              {isDueToday && ' · hoje'}
             </span>
           )}
           {task.category && task.category !== 'geral' && (
@@ -63,6 +77,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPerson, setFilterPerson] = useState('')
+  const [sortBy, setSortBy] = useState('')
   const [showCompleted, setShowCompleted] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   const [dragOverKey, setDragOverKey] = useState(null)
@@ -76,10 +91,33 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
 
   const findPerson = id => people.find(p => p.id === id)
   const categories = [...new Set(tasks.map(t => t.category).filter(c => c && c !== 'geral'))]
-  const hasFilters = search || filterCategory || filterPerson || !showCompleted
+  const hasFilters = search || filterCategory || filterPerson || !showCompleted || sortBy
+
+  function applySort(list) {
+    if (!sortBy) return list
+    const sorted = [...list]
+    if (sortBy === 'due_asc') {
+      sorted.sort((a, b) => {
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return a.due_date.localeCompare(b.due_date)
+      })
+    } else if (sortBy === 'due_desc') {
+      sorted.sort((a, b) => {
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return b.due_date.localeCompare(a.due_date)
+      })
+    } else if (sortBy === 'title') {
+      sorted.sort((a, b) => a.title.localeCompare(b.title, 'pt'))
+    } else if (sortBy === 'created_desc') {
+      sorted.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    }
+    return sorted
+  }
 
   function filterTasks(qKey) {
-    return tasks.filter(t => {
+    const filtered = tasks.filter(t => {
       if (t.quadrant !== qKey) return false
       if (!showCompleted && t.status === 'completed') return false
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
@@ -87,6 +125,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       if (filterPerson && t.delegated_to !== filterPerson) return false
       return true
     })
+    return applySort(filtered)
   }
 
   function handleDragStart(e, task) {
@@ -105,8 +144,22 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   }
 
   function clearFilters() {
-    setSearch(''); setFilterCategory(''); setFilterPerson(''); setShowCompleted(true)
+    setSearch(''); setFilterCategory(''); setFilterPerson(''); setShowCompleted(true); setSortBy('')
   }
+
+  const SortSelect = ({ className = '' }) => (
+    <select
+      className={`text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none ${className}`}
+      value={sortBy}
+      onChange={e => setSortBy(e.target.value)}
+    >
+      <option value="">Ordenar</option>
+      <option value="due_asc">Prazo ↑</option>
+      <option value="due_desc">Prazo ↓</option>
+      <option value="title">A–Z</option>
+      <option value="created_desc">Mais recentes</option>
+    </select>
+  )
 
   function QuadrantContent({ q }) {
     const qTasks = filterTasks(q.key)
@@ -138,7 +191,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       {/* Filter bar */}
       <div className="flex flex-col gap-1.5 px-3 md:px-4 py-2 border-b border-notion-border flex-shrink-0">
         <div className="flex items-center gap-2">
-          {/* Search — full width on mobile */}
+          {/* Search */}
           <div className="relative flex-1 md:flex-none">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-notion-muted pointer-events-none" />
             <input
@@ -156,7 +209,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
             )}
           </div>
 
-          {/* Desktop filters inline */}
+          {/* Desktop filters */}
           {categories.length > 0 && (
             <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
               value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
@@ -171,6 +224,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
               {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
             </select>
           )}
+          <SortSelect className="hidden md:block" />
           <button onClick={() => setShowCompleted(v => !v)}
             className={`hidden md:flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
               !showCompleted ? 'border-notion-border2 text-notion-sub bg-notion-hover' : 'border-notion-border text-notion-muted hover:border-notion-border2 hover:text-notion-sub'
@@ -184,7 +238,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
             </button>
           )}
 
-          {/* Mobile: filter toggle button */}
+          {/* Mobile: filter toggle */}
           <button
             onClick={() => setShowFilters(v => !v)}
             className={`md:hidden flex items-center gap-1 px-2.5 py-1.5 rounded-md border text-sm transition-colors ${
@@ -213,6 +267,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
                 {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
               </select>
             )}
+            <SortSelect className="flex-1" />
             <button onClick={() => setShowCompleted(v => !v)}
               className={`flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
                 !showCompleted ? 'border-notion-border2 text-notion-sub bg-notion-hover' : 'border-notion-border text-notion-muted'
@@ -229,19 +284,22 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
         )}
       </div>
 
-      {/* ── MOBILE: tab bar + single quadrant ── */}
+      {/* MOBILE: tab bar + single quadrant */}
       <div className="md:hidden flex flex-col flex-1 min-h-0 overflow-hidden">
-        {/* Quadrant tabs */}
         <div className="flex flex-shrink-0 border-b border-notion-border">
           {QUADRANTS.map(q => {
             const pending = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed').length
+            const overdue = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed' && t.due_date && t.due_date < TODAY).length
             const active = mobileQ === q.key
             return (
               <button key={q.key} onClick={() => setMobileQ(q.key)}
                 className={`flex-1 flex flex-col items-center py-2 gap-0.5 border-b-2 transition-colors ${
                   active ? 'border-notion-text text-notion-text' : 'border-transparent text-notion-muted'
                 }`}>
-                <span className={`w-2 h-2 rounded-full ${q.dot}`} />
+                <div className="relative">
+                  <span className={`w-2 h-2 rounded-full block ${q.dot}`} />
+                  {overdue > 0 && <span className="absolute -top-0.5 -right-1 w-1.5 h-1.5 rounded-full bg-red-400" />}
+                </div>
                 <span className="text-[10px] font-medium leading-tight">{q.label.split(' ')[0]}</span>
                 {pending > 0 && (
                   <span className={`text-[10px] tabular-nums font-semibold ${active ? 'text-notion-text' : 'text-notion-muted'}`}>{pending}</span>
@@ -251,7 +309,6 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
           })}
         </div>
 
-        {/* Single quadrant view */}
         {(() => {
           const q = QUADRANTS.find(q => q.key === mobileQ)
           return (
@@ -273,10 +330,11 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
         })()}
       </div>
 
-      {/* ── DESKTOP: 2×2 grid ── */}
+      {/* DESKTOP: 2×2 grid */}
       <div className="hidden md:grid flex-1 min-h-0 grid-cols-2 grid-rows-2 divide-x divide-y divide-notion-border overflow-hidden">
         {QUADRANTS.map(q => {
           const pending = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed').length
+          const overdue = tasks.filter(t => t.quadrant === q.key && t.status !== 'completed' && t.due_date && t.due_date < TODAY).length
           const isDropTarget = dragOverKey === q.key
           return (
             <div key={q.key}
@@ -294,7 +352,12 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {pending > 0 && <span className="text-xs text-notion-muted tabular-nums">{pending}</span>}
+                  {overdue > 0 && (
+                    <span className="text-xs text-red-500 tabular-nums font-medium flex items-center gap-0.5">
+                      <AlertCircle size={11} /> {overdue}
+                    </span>
+                  )}
+                  {pending > 0 && overdue === 0 && <span className="text-xs text-notion-muted tabular-nums">{pending}</span>}
                   <button onClick={() => onNew(q.key)} className="text-notion-muted hover:text-notion-text transition-colors">
                     <Plus size={15} />
                   </button>

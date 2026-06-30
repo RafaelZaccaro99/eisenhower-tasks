@@ -1,9 +1,10 @@
-const { sb, cors } = require('./_lib')
+const { sb, cors, requireAuth } = require('./_lib')
 
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
+  const token = requireAuth(req, res)
+  if (!token) return
 
   try {
     if (req.method === 'GET') {
@@ -14,7 +15,6 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const d = req.body
       const row = {
-        id: d.id || undefined,
         name: d.name,
         role: d.role || null,
         sector: d.sector || null,

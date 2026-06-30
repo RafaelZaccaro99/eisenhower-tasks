@@ -1,13 +1,11 @@
-const BASE = '/slack-api'
-
 async function slackCall(method, token, body) {
-  const res = await fetch(`${BASE}/${method}`, {
+  const res = await fetch('/api/slack', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ slackMethod: method, ...body }),
   })
   const data = await res.json()
   if (!data.ok) throw new Error(data.error ?? 'slack_error')
@@ -39,10 +37,11 @@ export function buildBlocks(message, task) {
   if (task) {
     const quadrantLabel = { q1: '🔴 Fazer agora', q2: '🔵 Agendar', q3: '🟡 Delegar', q4: '⚪ Eliminar' }
     const lines = [
-      `*📌 Tarefa relacionada:* ${task.title}`,
+      `*📌 Tarefa:* ${task.title}`,
       `*Quadrante:* ${quadrantLabel[task.quadrant] ?? task.quadrant}`,
       task.due_date ? `*Prazo:* ${task.due_date}` : null,
       task.category ? `*Categoria:* ${task.category}` : null,
+      task.description ? `*Descrição:* ${task.description}` : null,
     ].filter(Boolean)
 
     blocks.push({ type: 'divider' })
@@ -55,7 +54,6 @@ export function buildBlocks(message, task) {
   return blocks
 }
 
-// Derive quadrant from urgent/important flags
 export function taskQuadrant(task) {
   if (task.urgent && task.important) return 'q1'
   if (!task.urgent && task.important) return 'q2'

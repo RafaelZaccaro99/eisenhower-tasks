@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Check, Trash2, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react'
+import { Check, Trash2, RotateCcw, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, isWithinInterval } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
@@ -8,6 +8,27 @@ const Q_INFO = {
   q2: { label: 'Agendou',    color: 'text-blue-500',        bg: 'bg-blue-50',         dot: 'bg-blue-400'        },
   q3: { label: 'Delegou',    color: 'text-amber-500',       bg: 'bg-amber-50',        dot: 'bg-amber-400'       },
   q4: { label: 'Eliminou',   color: 'text-notion-muted',    bg: 'bg-notion-surface',  dot: 'bg-notion-border2'  },
+}
+
+function exportCSV(tasks) {
+  const headers = ['Título', 'Quadrante', 'Categoria', 'Prazo', 'Criada em']
+  const rows = tasks.map(t => [
+    `"${(t.title || '').replace(/"/g, '""')}"`,
+    Q_INFO[t.quadrant]?.label || t.quadrant,
+    t.category || 'geral',
+    t.due_date || '',
+    t.created_at ? t.created_at.split('T')[0] : '',
+  ])
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `eisenhower-historico-${new Date().toISOString().split('T')[0]}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 function StatCard({ label, value, color = 'text-notion-text', dot }) {
@@ -89,7 +110,6 @@ export default function History({ tasks, onDelete, onToggle }) {
 
   const byQ = q => completed.filter(t => t.quadrant === q)
 
-  // Group by week (last 8 weeks)
   const weeks = []
   for (let i = 0; i < 8; i++) {
     const wStart = addWeeks(weekStart, -i)
@@ -111,7 +131,6 @@ export default function History({ tasks, onDelete, onToggle }) {
     }
   }
 
-  // Tasks older than 8 weeks
   const cutoff = addWeeks(weekStart, -8)
   const older = completed.filter(t => {
     try { return parseISO(t.created_at) < cutoff }
@@ -128,6 +147,16 @@ export default function History({ tasks, onDelete, onToggle }) {
           <h2 className="text-sm font-semibold text-notion-text">Histórico</h2>
           <p className="text-xs text-notion-muted">{completed.length} tarefa{completed.length !== 1 ? 's' : ''} concluída{completed.length !== 1 ? 's' : ''}</p>
         </div>
+        {completed.length > 0 && (
+          <button
+            onClick={() => exportCSV(completed)}
+            className="btn-ghost text-xs"
+            title="Exportar histórico como CSV"
+          >
+            <Download size={13} />
+            Exportar CSV
+          </button>
+        )}
       </div>
 
       {/* Stats */}

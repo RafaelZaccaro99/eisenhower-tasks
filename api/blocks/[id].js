@@ -1,10 +1,11 @@
-const { sb, cors } = require('../_lib')
+const { sb, cors, requireAuth } = require('../_lib')
 
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
+  const token = requireAuth(req, res)
+  if (!token) return
   const { id } = req.query
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
 
   try {
     if (req.method === 'PUT') {

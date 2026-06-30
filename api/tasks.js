@@ -1,9 +1,10 @@
-const { sb, calcQuadrant, cors } = require('./_lib')
+const { sb, calcQuadrant, cors, requireAuth } = require('./_lib')
 
 module.exports = async (req, res) => {
   cors(res)
   if (req.method === 'OPTIONS') return res.status(200).end()
-  const token = (req.headers.authorization || '').replace('Bearer ', '')
+  const token = requireAuth(req, res)
+  if (!token) return
 
   try {
     if (req.method === 'GET') {
@@ -14,7 +15,6 @@ module.exports = async (req, res) => {
     if (req.method === 'POST') {
       const d = req.body
       const row = {
-        id: d.id || undefined,
         title: d.title,
         description: d.description || '',
         urgent: !!d.urgent,
@@ -24,6 +24,8 @@ module.exports = async (req, res) => {
         due_date: d.due_date || null,
         category: d.category || 'geral',
         delegated_to: d.delegated_to || null,
+        recurrence: d.recurrence || null,
+        recurrence_end: d.recurrence_end || null,
       }
       const created = await sb('/tasks', 'POST', row, token)
       return res.status(201).json(Array.isArray(created) ? created[0] : created)
