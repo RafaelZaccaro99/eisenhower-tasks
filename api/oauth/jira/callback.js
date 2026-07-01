@@ -44,6 +44,7 @@ module.exports = async (req, res) => {
     const resources = await resourcesRes.json()
     const cloudId = resources[0]?.id || ''
     const siteName = resources[0]?.name || 'Jira'
+    const siteUrl = resources[0]?.url || ''
 
     const expiresAt = tokens.expires_in
       ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
@@ -57,9 +58,11 @@ module.exports = async (req, res) => {
       name: siteName,
       color: '#0052CC',
       access_token: encrypt(tokens.access_token),
-      refresh_token: tokens.refresh_token ? encrypt(tokens.refresh_token) : '',
+      refresh_token: tokens.refresh_token
+        ? encrypt(tokens.refresh_token)
+        : (existing[0]?.refresh_token || ''),
       expires_at: expiresAt,
-      config: { cloud_id: cloudId },
+      config: { ...(existing[0]?.config || {}), cloud_id: cloudId, site_url: siteUrl },
       enabled: true,
     }
 
