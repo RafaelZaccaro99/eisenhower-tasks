@@ -76,7 +76,7 @@ module.exports = async (req, res) => {
     const jiraData = await jiraRes.json()
     if (jiraData.errorMessages?.length) throw new Error(jiraData.errorMessages[0])
 
-    const baseUrl = `https://${integration.name.toLowerCase().replace(/\s/g, '')}.atlassian.net`
+    const baseUrl = integration.config?.site_url || `https://${integration.name.toLowerCase().replace(/\s/g, '')}.atlassian.net`
 
     const rows = (jiraData.issues || []).map(issue => ({
       integration_id,
