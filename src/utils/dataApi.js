@@ -93,6 +93,19 @@ export const dataApi = {
     list:   ()     => sb('/status_history?order=changed_at.asc&limit=2000'),
     create: (body) => sb('/status_history', 'POST', { ...body, user_id: getUserId() }),
   },
+  integrations: {
+    list:   ()         => sb('/calendar_integrations?order=created_at.asc'),
+    create: (body)     => sb('/calendar_integrations', 'POST', { ...body, user_id: getUserId() }),
+    update: (id, body) => sb(`/calendar_integrations?id=eq.${id}`, 'PATCH', body),
+    delete: (id)       => sb(`/calendar_integrations?id=eq.${id}`, 'DELETE'),
+  },
+  external_events: {
+    listByIntegrations: (ids) => {
+      if (!ids.length) return Promise.resolve([])
+      return sb(`/external_events?integration_id=in.(${ids.join(',')})&order=date.asc,start_time.asc`)
+    },
+    deleteByIntegration: (id) => sb(`/external_events?integration_id=eq.${id}`, 'DELETE'),
+  },
   sync: async (tasks, people, blocks) => {
     const uid = getUserId()
     if (!uid) return { ok: true }

@@ -2,5 +2,11 @@
   "installCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install",
   "buildCommand": "vite build --config vite.web.config.js",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
+  "crons": [
+    {
+      "path": "/api/integrations/cron-sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }

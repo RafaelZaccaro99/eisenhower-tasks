@@ -14,6 +14,7 @@ import { usePeople } from './hooks/usePeople'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useNotifications } from './hooks/useNotifications'
+import { useIntegrations } from './hooks/useIntegrations'
 import { isServerUp, dataApi, setUnauthorizedHandler } from './utils/dataApi'
 import { setProxyToken } from './utils/aiProxy'
 import { v4 as uuidv4 } from 'uuid'
@@ -38,6 +39,21 @@ export default function App() {
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const { settings, save, saveAnamnesis } = useSettings(accessToken)
   useNotifications(tasks, loading)
+  const {
+    integrations, externalEvents, loading: integrationsLoading,
+    createIntegration, deleteIntegration, syncIntegration, updateIntegration,
+    connectOAuth, createGoogleEvent, createClickupTask, createJiraIssue,
+  } = useIntegrations(accessToken)
+
+  // Handle OAuth callback redirect params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get('connected')
+    const oauthError = params.get('error')
+    if (connected || oauthError) {
+      window.history.replaceState({}, '', '/')
+    }
+  }, [])
 
   useEffect(() => {
     function onKey(e) {
@@ -213,7 +229,13 @@ export default function App() {
             onMoveTask={updateTask}
           />
         ) : view === 'agenda' ? (
-          <Agenda tasks={tasks} />
+          <Agenda
+            tasks={tasks}
+            people={people}
+            externalEvents={externalEvents}
+            onCreateGoogleEvent={integrations.some(i => i.provider === 'google') ? createGoogleEvent : null}
+            onEditTask={task => setModal({ task })}
+          />
         ) : view === 'people' ? (
           <People
             people={people} tasks={tasks}
@@ -235,6 +257,15 @@ export default function App() {
               }
             }}
             onRestartOnboarding={() => save({ onboardingCompleted: false })}
+            integrations={integrations}
+            integrationsLoading={integrationsLoading}
+            onAddIntegration={createIntegration}
+            onDeleteIntegration={deleteIntegration}
+            onSyncIntegration={syncIntegration}
+            onConnectOAuth={connectOAuth}
+            onUpdateIntegrationConfig={(id, configPatch) =>
+              updateIntegration(id, { config: { ...(integrations.find(i => i.id === id)?.config || {}), ...configPatch } })
+            }
           />
         )}
       </main>
@@ -265,6 +296,11 @@ export default function App() {
           aiConfig={aiConfig}
           anamnesis={settings.anamnesis}
           slackBotToken={settings.slackBotToken}
+          integrations={integrations}
+          onPushExternal={async (integration, payload) => {
+            if (integration.provider === 'clickup') return createClickupTask(integration, payload)
+            if (integration.provider === 'jira') return createJiraIssue(integration, payload)
+          }}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />

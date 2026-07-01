@@ -43,7 +43,7 @@ function Toggle({ label, active, onClick, activeClass }) {
   )
 }
 
-export default function TaskModal({ task, people = [], assistantEnabled = false, aiConfig = {}, anamnesis = {}, slackBotToken = '', onSave, onClose }) {
+export default function TaskModal({ task, people = [], assistantEnabled = false, aiConfig = {}, anamnesis = {}, slackBotToken = '', integrations = [], onPushExternal, onSave, onClose }) {
   const { enabled: aiEnabled = false, provider, model, apiKey: claudeApiKey = '' } = aiConfig
   const isEdit = !!task?.id
   const [form, setForm] = useState({
@@ -61,6 +61,8 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
   const [aiError, setAiError] = useState(null)
   const [notifySlack, setNotifySlack] = useState(false)
   const [slackStatus, setSlackStatus] = useState(null)
+  const [pushToExternal, setPushToExternal] = useState({}) // { [integrationId]: boolean }
+  const [pushStatus, setPushStatus] = useState({}) // { [integrationId]: 'idle'|'sending'|'ok'|'error' }
   const debounceRef = useRef(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -131,6 +133,21 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
       recurrence_end: form.recurrence_end || null,
     }
     onSave(cleanForm)
+
+    // Push to external providers
+    const targets = integrations.filter(i => pushToExternal[i.id])
+    if (targets.length > 0 && onPushExternal) {
+      const payload = { title: form.title, date: form.due_date || null, description: form.description || '' }
+      for (const integration of targets) {
+        setPushStatus(prev => ({ ...prev, [integration.id]: 'sending' }))
+        try {
+          await onPushExternal(integration, payload)
+          setPushStatus(prev => ({ ...prev, [integration.id]: 'ok' }))
+        } catch {
+          setPushStatus(prev => ({ ...prev, [integration.id]: 'error' }))
+        }
+      }
+    }
   }
 
   const statusOptions = isEdit
@@ -287,6 +304,27 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
                 </span>
               </label>
             )}
+
+            {/* Push to external integrations */}
+            {integrations.filter(i => ['clickup', 'jira'].includes(i.provider)).map(integration => (
+              <label key={integration.id} className="flex items-center gap-2 mt-2 cursor-pointer group">
+                <span
+                  className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                    pushToExternal[integration.id] ? 'bg-notion-text border-notion-text' : 'border-notion-border2 group-hover:border-notion-sub'
+                  }`}
+                  onClick={() => setPushToExternal(prev => ({ ...prev, [integration.id]: !prev[integration.id] }))}
+                >
+                  {pushToExternal[integration.id] && <Check size={10} strokeWidth={3} className="text-white" />}
+                </span>
+                <span className="text-xs text-notion-sub flex items-center gap-1">
+                  {integration.provider === 'clickup' ? '🟣' : '🔷'}
+                  Criar em {integration.name}
+                  {pushStatus[integration.id] === 'sending' && <Loader2 size={10} className="animate-spin ml-1" />}
+                  {pushStatus[integration.id] === 'ok' && <span className="text-green-500 ml-1">criado</span>}
+                  {pushStatus[integration.id] === 'error' && <span className="text-red-400 ml-1">falhou</span>}
+                </span>
+              </label>
+            ))}
           </div>
 
           {/* Prazo + Categoria */}
