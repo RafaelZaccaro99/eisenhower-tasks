@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { Check, Plus, Trash2, User, Search, X, Eye, EyeOff, SlidersHorizontal, RefreshCw, AlertCircle } from 'lucide-react'
+import { Check, Plus, Trash2, User, Search, X, SlidersHorizontal, RefreshCw, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { STATUS_CONFIG, DONE_STATUSES } from '../utils/statusConfig'
@@ -87,7 +87,6 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   const [filterPerson, setFilterPerson] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('')
-  const [showCompleted, setShowCompleted] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   const [dragOverKey, setDragOverKey] = useState(null)
   const [mobileQ, setMobileQ] = useState('q1')
@@ -126,7 +125,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
 
   const findPerson = id => people.find(p => p.id === id)
   const categories = [...new Set(tasks.map(t => t.category).filter(c => c && c !== 'geral'))]
-  const hasFilters = search || filterCategory || filterPerson || filterStatus || !showCompleted || sortBy
+  const hasFilters = search || filterCategory || filterPerson || filterStatus || sortBy
 
   function applySort(list) {
     if (!sortBy) return list
@@ -154,7 +153,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   function filterTasks(qKey) {
     const filtered = tasks.filter(t => {
       if (t.quadrant !== qKey) return false
-      if (!showCompleted && DONE_STATUSES.includes(t.status)) return false
+      if (DONE_STATUSES.includes(t.status)) return false
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterCategory && t.category !== filterCategory) return false
       if (filterPerson && t.delegated_to !== filterPerson) return false
@@ -180,7 +179,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   }
 
   function clearFilters() {
-    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterStatus(''); setShowCompleted(true); setSortBy('')
+    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterStatus(''); setSortBy('')
   }
 
   const SortSelect = ({ className = '' }) => (
@@ -268,13 +267,6 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
             ))}
           </select>
           <SortSelect className="hidden md:block" />
-          <button onClick={() => setShowCompleted(v => !v)}
-            className={`hidden md:flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
-              !showCompleted ? 'border-notion-border2 text-notion-sub bg-notion-hover' : 'border-notion-border text-notion-muted hover:border-notion-border2 hover:text-notion-sub'
-            }`}>
-            {showCompleted ? <Eye size={13} /> : <EyeOff size={13} />}
-            Concluídas
-          </button>
           {hasFilters && (
             <button onClick={clearFilters} className="hidden md:flex text-notion-muted hover:text-red-400 transition-colors p-1" title="Limpar filtros">
               <X size={13} />
@@ -318,13 +310,6 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
               ))}
             </select>
             <SortSelect className="flex-1" />
-            <button onClick={() => setShowCompleted(v => !v)}
-              className={`flex items-center gap-1.5 text-sm px-2.5 py-1.5 rounded-md border transition-colors ${
-                !showCompleted ? 'border-notion-border2 text-notion-sub bg-notion-hover' : 'border-notion-border text-notion-muted'
-              }`}>
-              {showCompleted ? <Eye size={13} /> : <EyeOff size={13} />}
-              Concluídas
-            </button>
             {hasFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1 text-sm px-2.5 py-1.5 rounded-md border border-notion-border text-notion-muted hover:text-red-400">
                 <X size={13} /> Limpar
