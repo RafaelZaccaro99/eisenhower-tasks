@@ -3,6 +3,7 @@ import { Plus, Pencil, Trash2, X, User, MessageCircle, ChevronDown, AlertCircle 
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import SlackComposer from './SlackComposer'
+import { DONE_STATUSES } from '../utils/statusConfig'
 
 const HIERARQUIAS = ['Superior', 'Par', 'Subordinado', 'Externo']
 const SETORES = ['Tecnologia', 'Marketing', 'Vendas', 'Financeiro', 'RH', 'Operações', 'Jurídico', 'Diretoria', 'Outro']
@@ -140,7 +141,7 @@ function PersonCard({ person, tasks = [], onEdit, onDelete, onSlack }) {
   // Demais: apenas tarefas do quadrante "Delegar" (Q3) — envolvimento conjunto
   const relatedTasks = tasks.filter(t => {
     if (t.delegated_to !== person.id) return false
-    if (t.status === 'completed') return false
+    if (DONE_STATUSES.includes(t.status)) return false
     return person.hierarchy === 'Subordinado' ? true : t.quadrant === 'q3'
   })
 

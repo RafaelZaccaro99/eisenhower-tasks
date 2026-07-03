@@ -2,14 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { isServerUp, dataApi } from '../utils/dataApi'
 import { calcQuadrant } from '../utils/statusConfig'
-
-function nextDueDate(dueDate, recurrence) {
-  const d = new Date(dueDate + 'T00:00:00')
-  if (recurrence === 'daily') d.setDate(d.getDate() + 1)
-  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
-  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
-  return d.toISOString().split('T')[0]
-}
+import { nextDueDate } from '../utils/recurrence'
 
 const ipc = window.api?.tasks
 
@@ -100,6 +93,8 @@ export function useTasks() {
       due_date: data.due_date || null,
       category: data.category || 'geral',
       delegated_to: data.delegated_to || null,
+      assigned_to: data.assigned_to || null,
+      client_id: data.client_id || null,
       recurrence: data.recurrence || null,
       recurrence_end: data.recurrence_end || null,
     }
@@ -123,10 +118,15 @@ export function useTasks() {
       recurrence: data.recurrence || null,
       recurrence_end: data.recurrence_end || null,
     }
+    // Não sobrescrever o responsável com valor vazio
+    if (!patch.assigned_to) delete patch.assigned_to
+    // client_id vazio = remover vínculo com cliente
+    if ('client_id' in patch && !patch.client_id) patch.client_id = null
 
     // Record status transition if status changed
     const existing = tasksRef.current.find(t => t.id === data.id)
-    if (existing && data.status && existing.status !== data.status) {
+    const statusChanged = existing && data.status && existing.status !== data.status
+    if (statusChanged) {
       const entry = {
         id: uuidv4(),
         task_id: data.id,
@@ -152,8 +152,29 @@ export function useTasks() {
       if (idx !== -1) all[idx] = patch
       lsWrite(all)
     }
+
+    if (statusChanged && data.status === 'completed') {
+      await maybeSpawnNextRecurrence(patch)
+    }
     await load()
   }, [load])
+
+  // Gera a próxima instância de uma tarefa recorrente ao concluí-la.
+  // Base do cálculo: due_date da tarefa, ou hoje quando não há prazo.
+  const maybeSpawnNextRecurrence = useCallback(async (task) => {
+    if (!task.recurrence || task.recurrence === 'none') return
+    const today = new Date().toISOString().split('T')[0]
+    const nextDate = nextDueDate(task.due_date || today, task.recurrence)
+    const withinEnd = !task.recurrence_end || nextDate <= task.recurrence_end
+    if (!withinEnd) return
+    await createTask({
+      ...task,
+      id: undefined,
+      status: 'pending',
+      due_date: nextDate,
+      created_at: undefined,
+    })
+  }, [createTask])
 
   const deleteTask = useCallback(async (id) => {
     if (ipc) {
@@ -169,21 +190,7 @@ export function useTasks() {
   const toggleStatus = useCallback(async (task) => {
     const next = task.status === 'completed' ? 'pending' : 'completed'
     await updateTask({ ...task, status: next })
-
-    if (next === 'completed' && task.recurrence && task.recurrence !== 'none' && task.due_date) {
-      const nextDate = nextDueDate(task.due_date, task.recurrence)
-      const withinEnd = !task.recurrence_end || nextDate <= task.recurrence_end
-      if (withinEnd) {
-        await createTask({
-          ...task,
-          id: undefined,
-          status: 'pending',
-          due_date: nextDate,
-          created_at: undefined,
-        })
-      }
-    }
-  }, [updateTask, createTask])
+  }, [updateTask])
 
   return { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus }
 }

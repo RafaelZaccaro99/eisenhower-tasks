@@ -1,20 +1,33 @@
 // Chama o Supabase REST diretamente do navegador (sem intermediário Vercel).
 // O token JWT do usuário é enviado como Authorization — o RLS do Supabase
-// garante que cada usuário acessa apenas seus próprios dados.
+// garante que cada usuário acessa apenas os dados do próprio workspace.
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 let _authToken = null
 let _onUnauthorized = null
+let _workspaceId = null
 
 export function setAuthToken(token) { _authToken = token }
 export function setUnauthorizedHandler(fn) { _onUnauthorized = fn }
+export function setWorkspaceId(id) { _workspaceId = id }
 
 function getUserId() {
   if (!_authToken) return null
   try { return JSON.parse(atob(_authToken.split('.')[1])).sub } catch { return null }
 }
+
+// Filtro de workspace nos SELECTs (o RLS protege; o filtro evita misturar
+// dados quando o usuário pertence a mais de um workspace)
+const wsFilter = () => (_workspaceId ? `&workspace_id=eq.${_workspaceId}` : '')
+
+// Carimba user_id e workspace_id nos INSERTs
+const stamp = (body) => ({
+  ...body,
+  user_id: getUserId(),
+  ...(_workspaceId ? { workspace_id: _workspaceId } : {}),
+})
 
 async function sbOnce(path, method, body, upsert) {
   const headers = {
@@ -72,28 +85,34 @@ export function resetServerStatus() { _statusCache = null }
 
 export const dataApi = {
   tasks: {
-    list:   ()         => sb('/tasks?order=created_at.asc'),
-    create: (body)     => sb('/tasks', 'POST', { ...body, user_id: getUserId() }),
+    list:   ()         => sb(`/tasks?order=created_at.asc${wsFilter()}`),
+    create: (body) => {
+      const row = stamp(body)
+      row.created_by = getUserId()
+      row.assigned_to = body.assigned_to || getUserId()
+      return sb('/tasks', 'POST', row)
+    },
     update: (id, body) => sb(`/tasks?id=eq.${id}`, 'PATCH', body),
     delete: (id)       => sb(`/tasks?id=eq.${id}`, 'DELETE'),
   },
   people: {
-    list:   ()         => sb('/people?order=created_at.asc'),
-    create: (body)     => sb('/people', 'POST', { ...body, user_id: getUserId() }),
+    list:   ()         => sb(`/people?order=created_at.asc${wsFilter()}`),
+    create: (body)     => sb('/people', 'POST', stamp(body)),
     update: (id, body) => sb(`/people?id=eq.${id}`, 'PATCH', body),
     delete: (id)       => sb(`/people?id=eq.${id}`, 'DELETE'),
   },
   blocks: {
-    list:   ()         => sb('/blocks?order=date.asc,start_time.asc'),
-    create: (body)     => sb('/blocks', 'POST', { ...body, user_id: getUserId() }),
+    list:   ()         => sb(`/blocks?order=date.asc,start_time.asc${wsFilter()}`),
+    create: (body)     => sb('/blocks', 'POST', stamp(body)),
     update: (id, body) => sb(`/blocks?id=eq.${id}`, 'PATCH', body),
     delete: (id)       => sb(`/blocks?id=eq.${id}`, 'DELETE'),
   },
   status_history: {
-    list:   ()     => sb('/status_history?order=changed_at.asc&limit=2000'),
-    create: (body) => sb('/status_history', 'POST', { ...body, user_id: getUserId() }),
+    list:   ()     => sb(`/status_history?order=changed_at.asc&limit=2000${wsFilter()}`),
+    create: (body) => sb('/status_history', 'POST', stamp(body)),
   },
   integrations: {
+    // Integrações de calendário continuam por usuário (não são dados de equipe)
     list:   ()         => sb('/calendar_integrations?order=created_at.asc'),
     create: (body)     => sb('/calendar_integrations', 'POST', { ...body, user_id: getUserId() }),
     update: (id, body) => sb(`/calendar_integrations?id=eq.${id}`, 'PATCH', body),
@@ -106,12 +125,32 @@ export const dataApi = {
     },
     deleteByIntegration: (id) => sb(`/external_events?integration_id=eq.${id}`, 'DELETE'),
   },
+  clients: {
+    list:   ()         => sb(`/clients?order=name.asc&archived=eq.false${wsFilter()}`),
+    create: (body)     => sb('/clients', 'POST', { ...stamp(body), created_by: getUserId() }),
+    update: (id, body) => sb(`/clients?id=eq.${id}`, 'PATCH', body),
+    delete: (id)       => sb(`/clients?id=eq.${id}`, 'DELETE'),
+  },
+  workspaces: {
+    bootstrap: ()    => sb('/rpc/bootstrap_workspace', 'POST', {}),
+    directory: (ws)  => sb('/rpc/workspace_directory', 'POST', { ws }),
+    invite: (wsId, email, role) => sb('/workspace_members', 'POST', {
+      workspace_id: wsId,
+      invited_email: email.toLowerCase().trim(),
+      role,
+      status: 'invited',
+      invited_by: getUserId(),
+    }),
+    updateMember: (id, patch) => sb(`/workspace_members?id=eq.${id}`, 'PATCH', patch),
+    removeMember: (id)        => sb(`/workspace_members?id=eq.${id}`, 'DELETE'),
+    rename: (wsId, name)      => sb(`/workspaces?id=eq.${wsId}`, 'PATCH', { name }),
+  },
   sync: async (tasks, people, blocks) => {
     const uid = getUserId()
     if (!uid) return { ok: true }
     const upsertTable = (rows, table) =>
       rows?.length
-        ? sb(`/${table}`, 'POST', rows.map(r => ({ ...r, user_id: uid })), true)
+        ? sb(`/${table}`, 'POST', rows.map(r => stamp(r)), true)
         : Promise.resolve({ ok: true })
     await Promise.all([
       upsertTable(tasks,  'tasks'),

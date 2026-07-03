@@ -197,8 +197,12 @@ function WeekGroup({ weekLabel, tasks, slaByTask, onRestore, onDelete }) {
   )
 }
 
-export default function History({ tasks, statusHistory = [], onDelete, onToggle }) {
-  const done = tasks.filter(t => DONE_STATUSES.includes(t.status))
+export default function History({ tasks, statusHistory = [], members = [], currentUserId = null, isManager = false, onDelete, onToggle }) {
+  const [filterAssignee, setFilterAssignee] = useState('')
+  const showTeamFeatures = isManager && members.length > 1
+  const done = tasks.filter(t =>
+    DONE_STATUSES.includes(t.status) && (!filterAssignee || t.assigned_to === filterAssignee)
+  )
   const completed = done.filter(t => t.status === 'completed')
   const now = new Date()
   const weekStart = startOfWeek(now, { weekStartsOn: 1 })
@@ -261,16 +265,30 @@ export default function History({ tasks, statusHistory = [], onDelete, onToggle 
           <h2 className="text-sm font-semibold text-notion-text">Histórico</h2>
           <p className="text-xs text-notion-muted">{done.length} tarefa{done.length !== 1 ? 's' : ''} encerrada{done.length !== 1 ? 's' : ''}</p>
         </div>
-        {done.length > 0 && (
-          <button
-            onClick={() => exportCSV(done, slaByTask)}
-            className="btn-ghost text-xs"
-            title="Exportar histórico como CSV"
-          >
-            <Download size={13} />
-            Exportar CSV
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {showTeamFeatures && (
+            <select
+              className="text-xs border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
+              value={filterAssignee}
+              onChange={e => setFilterAssignee(e.target.value)}
+            >
+              <option value="">Responsável</option>
+              {members.map(m => (
+                <option key={m.user_id} value={m.user_id}>{m.user_id === currentUserId ? `${m.name} (você)` : m.name}</option>
+              ))}
+            </select>
+          )}
+          {done.length > 0 && (
+            <button
+              onClick={() => exportCSV(done, slaByTask)}
+              className="btn-ghost text-xs"
+              title="Exportar histórico como CSV"
+            >
+              <Download size={13} />
+              Exportar CSV
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Volume stats */}

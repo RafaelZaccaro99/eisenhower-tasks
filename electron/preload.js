@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id) => ipcRenderer.invoke('tasks:delete', id),
   },
   agenda: {
+    getAll: () => ipcRenderer.invoke('agenda:getAll'),
     getByDate: (date) => ipcRenderer.invoke('agenda:getByDate', date),
     getRange: (range) => ipcRenderer.invoke('agenda:getRange', range),
     create: (block) => ipcRenderer.invoke('agenda:create', block),

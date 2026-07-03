@@ -43,13 +43,13 @@ function Toggle({ label, active, onClick, activeClass }) {
   )
 }
 
-export default function TaskModal({ task, people = [], assistantEnabled = false, aiConfig = {}, anamnesis = {}, slackBotToken = '', integrations = [], onPushExternal, onSave, onClose }) {
+export default function TaskModal({ task, people = [], clients = [], members = [], currentUserId = null, isManager = false, assistantEnabled = false, aiConfig = {}, anamnesis = {}, slackBotToken = '', integrations = [], onPushExternal, onSave, onClose }) {
   const { enabled: aiEnabled = false, provider, model, apiKey: claudeApiKey = '' } = aiConfig
   const isEdit = !!task?.id
   const [form, setForm] = useState({
     title: '', description: '', urgent: false, important: false,
-    due_date: '', category: 'geral', status: 'pending', delegated_to: '',
-    recurrence: 'none', recurrence_end: '',
+    due_date: '', category: 'geral', delegated_to: '',
+    recurrence_end: '',
     ...task,
     recurrence: task?.recurrence || 'none',
     status: task?.status || 'pending',
@@ -275,6 +275,26 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
             </div>
           </div>
 
+          {/* Responsável (membro do workspace) */}
+          {members.length > 1 && (
+            <div>
+              <p className="label mb-1">Responsável</p>
+              {isManager ? (
+                <select className="input" value={form.assigned_to || currentUserId || ''} onChange={e => set('assigned_to', e.target.value)}>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.user_id === currentUserId ? `${m.name} (você)` : m.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="input bg-notion-surface text-notion-muted cursor-not-allowed">
+                  {members.find(m => m.user_id === (form.assigned_to || currentUserId))?.name || 'Você'}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Delegar para */}
           <div>
             <p className="label mb-1">Delegar para</p>
@@ -341,6 +361,19 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
               </select>
             </div>
           </div>
+
+          {/* Cliente */}
+          {clients.length > 0 && (
+            <div>
+              <label className="label">Cliente</label>
+              <select className="input" value={form.client_id || ''} onChange={e => set('client_id', e.target.value)}>
+                <option value="">— sem cliente —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}{c.company ? ` · ${c.company}` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Recorrência */}
           <div className="grid grid-cols-2 gap-3">

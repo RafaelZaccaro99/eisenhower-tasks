@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { X, Send, Bot, Loader2, RotateCcw, CheckCircle2, AlertCircle } from 'lucide-react'
 import { callViaProxy } from '../utils/aiProxy'
+import { DONE_STATUSES } from '../utils/statusConfig'
 
 function buildSystemPrompt(tasks, people) {
   const today = new Date().toISOString().split('T')[0]
   const peopleMap = Object.fromEntries(people.map(p => [p.id, p.name]))
 
-  const pending = tasks.filter(t => t.status !== 'completed')
+  const pending = tasks.filter(t => !DONE_STATUSES.includes(t.status))
   const overdue = pending.filter(t => t.due_date && t.due_date < today)
 
   const byPerson = {}
@@ -21,8 +22,10 @@ function buildSystemPrompt(tasks, people) {
   const taskLines = tasks.map(t => {
     const who = t.delegated_to ? ` → ${peopleMap[t.delegated_to] || t.delegated_to}` : ''
     const deadline = t.due_date ? ` | prazo: ${t.due_date}` : ''
-    const late = t.due_date && t.due_date < today && t.status !== 'completed' ? ' [ATRASADA]' : ''
-    const status = t.status === 'completed' ? '[CONCLUÍDA]' : `[${(t.quadrant || '?').toUpperCase()}]`
+    const late = t.due_date && t.due_date < today && !DONE_STATUSES.includes(t.status) ? ' [ATRASADA]' : ''
+    const status = t.status === 'completed' ? '[CONCLUÍDA]'
+      : t.status === 'cancelled' ? '[CANCELADA]'
+      : `[${(t.quadrant || '?').toUpperCase()}]`
     return `${status} ${t.title}${deadline}${who}${late}`
   }).join('\n')
 
