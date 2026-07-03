@@ -11,9 +11,19 @@ function lsRead() {
 function lsWrite(blocks) { localStorage.setItem('eisenhower-blocks', JSON.stringify(blocks)) }
 
 const BLOCK_DEFAULTS = {
-  task_id: '', title: '', start_time: '09:00', end_time: '10:00',
-  color: '#60a5fa', locked: false, recurrence: 'none', recurrence_end: '',
+  task_id: null, title: '', start_time: '09:00', end_time: '10:00',
+  color: '#60a5fa', locked: false, recurrence: 'none', recurrence_end: null,
   participants: [], recurrence_exceptions: [], client_id: null,
+}
+
+// Supabase rejeita string vazia em colunas date/uuid ("" não é uma data/uuid
+// válida) — normaliza pra null antes de qualquer escrita.
+function normalizeBlock(block) {
+  const clean = { ...block }
+  if (clean.task_id === '') clean.task_id = null
+  if (clean.client_id === '') clean.client_id = null
+  if (clean.recurrence_end === '') clean.recurrence_end = null
+  return clean
 }
 
 export function useBlocks() {
@@ -49,22 +59,24 @@ export function useBlocks() {
   }, [blocks])
 
   const persistCreate = useCallback(async (block) => {
-    if (ipc) await ipc.create(block)
-    else if (serverMode) await dataApi.blocks.create(block)
-    else lsWrite([...lsRead(), block])
+    const clean = normalizeBlock(block)
+    if (ipc) await ipc.create(clean)
+    else if (serverMode) await dataApi.blocks.create(clean)
+    else lsWrite([...lsRead(), clean])
   }, [serverMode])
 
   const persistPatch = useCallback(async (id, patch) => {
+    const clean = normalizeBlock(patch)
     if (ipc) {
       const all = ipc.getAll ? await ipc.getAll() : []
       const existing = all.find(b => b.id === id)
-      if (existing) await ipc.update({ ...existing, ...patch })
+      if (existing) await ipc.update({ ...existing, ...clean })
     } else if (serverMode) {
-      await dataApi.blocks.update(id, patch)
+      await dataApi.blocks.update(id, clean)
     } else {
       const all = lsRead()
       const idx = all.findIndex(b => b.id === id)
-      if (idx !== -1) { all[idx] = { ...all[idx], ...patch }; lsWrite(all) }
+      if (idx !== -1) { all[idx] = { ...all[idx], ...clean }; lsWrite(all) }
     }
   }, [serverMode])
 
@@ -89,7 +101,7 @@ export function useBlocks() {
           ...block, ...patch,
           id: uuidv4(),
           date: patch.date || date, // ocorrência movida pode trocar de dia
-          recurrence: 'none', recurrence_end: '', recurrence_exceptions: [],
+          recurrence: 'none', recurrence_end: null, recurrence_exceptions: [],
         }
         delete detached.created_at; delete detached.seriesDate; delete detached.user_id
         await persistCreate(detached)
