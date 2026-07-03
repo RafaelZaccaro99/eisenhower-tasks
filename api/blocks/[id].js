@@ -22,6 +22,7 @@ module.exports = async (req, res) => {
         recurrence_end: d.recurrence_end || null,
         participants: Array.isArray(d.participants) ? d.participants : [],
         recurrence_exceptions: Array.isArray(d.recurrence_exceptions) ? d.recurrence_exceptions : [],
+        client_id: d.client_id || null,
       }
       const updated = await sb(`/blocks?id=eq.${id}`, 'PATCH', patch, token)
       return res.status(200).json(Array.isArray(updated) ? updated[0] : updated)

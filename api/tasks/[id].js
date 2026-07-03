@@ -20,6 +20,7 @@ module.exports = async (req, res) => {
         due_date: d.due_date || null,
         category: d.category || 'geral',
         delegated_to: d.delegated_to || null,
+        client_id: d.client_id || null,
         recurrence: d.recurrence || null,
         recurrence_end: d.recurrence_end || null,
       }

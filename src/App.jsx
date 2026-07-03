@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut, MessageCircle } from 'lucide-react'
+import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut, MessageCircle, Briefcase } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
+import Clients from './components/Clients'
 import People from './components/People'
 import Settings from './components/Settings'
 import History from './components/History'
@@ -15,6 +16,7 @@ import { useBlocks } from './hooks/useBlocks'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useWorkspace } from './hooks/useWorkspace'
+import { useClients } from './hooks/useClients'
 import { useNotifications } from './hooks/useNotifications'
 import { useIntegrations } from './hooks/useIntegrations'
 import { setUnauthorizedHandler } from './utils/dataApi'
@@ -23,6 +25,7 @@ import { setProxyToken } from './utils/aiProxy'
 const VIEWS = [
   { key: 'matrix',   label: 'Matriz',        icon: LayoutGrid   },
   { key: 'agenda',   label: 'Agenda',        icon: CalendarDays },
+  { key: 'clients',  label: 'Clientes',      icon: Briefcase    },
   { key: 'people',   label: 'Pessoas',       icon: Users        },
   { key: 'history',  label: 'Histórico',     icon: Clock        },
   { key: 'settings', label: 'Config',        icon: SettingsIcon },
@@ -72,6 +75,7 @@ function MainApp({ auth, ws }) {
 
   const currentUserId = user?.id
   const activeMembers = ws.members.filter(m => m.status === 'active')
+  const { clients, createClient, updateClient, deleteClient, archiveClient } = useClients(ws.workspace)
 
   // Handle OAuth callback redirect params
   useEffect(() => {
@@ -102,9 +106,10 @@ function MainApp({ auth, ws }) {
           break
         case '1': setView('matrix');   break
         case '2': setView('agenda');   break
-        case '3': setView('people');   break
-        case '4': setView('history');  break
-        case '5': setView('settings'); break
+        case '3': setView('clients');  break
+        case '4': setView('people');   break
+        case '5': setView('history');  break
+        case '6': setView('settings'); break
       }
     }
     window.addEventListener('keydown', onKey)
@@ -229,6 +234,7 @@ function MainApp({ auth, ws }) {
         ) : view === 'matrix' ? (
           <Matrix
             tasks={tasks} people={people}
+            clients={clients}
             members={activeMembers}
             currentUserId={currentUserId}
             isManager={ws.isManager}
@@ -242,10 +248,25 @@ function MainApp({ auth, ws }) {
           <Agenda
             tasks={tasks}
             people={people}
+            clients={clients}
             externalEvents={externalEvents}
             blocksApi={blocksApi}
             onCreateGoogleEvent={integrations.some(i => i.provider === 'google') ? createGoogleEvent : null}
             onEditTask={task => setModal({ task })}
+          />
+        ) : view === 'clients' ? (
+          <Clients
+            clients={clients}
+            tasks={tasks}
+            canManage={ws.isManager || !ws.workspace}
+            serverMode={serverMode}
+            onCreate={createClient}
+            onUpdate={updateClient}
+            onDelete={deleteClient}
+            onArchive={archiveClient}
+            onEditTask={task => setModal({ task })}
+            onToggleTask={toggleStatus}
+            onNewTaskForClient={client => setModal({ task: { urgent: false, important: true, client_id: client.id } })}
           />
         ) : view === 'people' ? (
           <People
@@ -315,6 +336,7 @@ function MainApp({ auth, ws }) {
         <TaskModal
           task={modal.task}
           people={people}
+          clients={clients}
           members={activeMembers}
           currentUserId={currentUserId}
           isManager={ws.isManager}

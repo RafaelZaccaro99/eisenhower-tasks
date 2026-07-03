@@ -43,7 +43,7 @@ function Toggle({ label, active, onClick, activeClass }) {
   )
 }
 
-export default function TaskModal({ task, people = [], members = [], currentUserId = null, isManager = false, assistantEnabled = false, aiConfig = {}, anamnesis = {}, slackBotToken = '', integrations = [], onPushExternal, onSave, onClose }) {
+export default function TaskModal({ task, people = [], clients = [], members = [], currentUserId = null, isManager = false, assistantEnabled = false, aiConfig = {}, anamnesis = {}, slackBotToken = '', integrations = [], onPushExternal, onSave, onClose }) {
   const { enabled: aiEnabled = false, provider, model, apiKey: claudeApiKey = '' } = aiConfig
   const isEdit = !!task?.id
   const [form, setForm] = useState({
@@ -361,6 +361,19 @@ export default function TaskModal({ task, people = [], members = [], currentUser
               </select>
             </div>
           </div>
+
+          {/* Cliente */}
+          {clients.length > 0 && (
+            <div>
+              <label className="label">Cliente</label>
+              <select className="input" value={form.client_id || ''} onChange={e => set('client_id', e.target.value)}>
+                <option value="">— sem cliente —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}{c.company ? ` · ${c.company}` : ''}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Recorrência */}
           <div className="grid grid-cols-2 gap-3">

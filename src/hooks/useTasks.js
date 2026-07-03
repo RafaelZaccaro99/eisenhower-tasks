@@ -94,6 +94,7 @@ export function useTasks() {
       category: data.category || 'geral',
       delegated_to: data.delegated_to || null,
       assigned_to: data.assigned_to || null,
+      client_id: data.client_id || null,
       recurrence: data.recurrence || null,
       recurrence_end: data.recurrence_end || null,
     }
@@ -119,6 +120,8 @@ export function useTasks() {
     }
     // Não sobrescrever o responsável com valor vazio
     if (!patch.assigned_to) delete patch.assigned_to
+    // client_id vazio = remover vínculo com cliente
+    if ('client_id' in patch && !patch.client_id) patch.client_id = null
 
     // Record status transition if status changed
     const existing = tasksRef.current.find(t => t.id === data.id)

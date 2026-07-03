@@ -11,7 +11,7 @@ const QUADRANTS = [
   { key: 'q4', label: 'Eliminar',     sub: 'Não urgente · Não importante', dot: 'bg-notion-border2', chip: 'bg-notion-surface text-notion-muted', urgent: false, important: false },
 ]
 
-function TaskRow({ task, q, person, assigneeName, onEdit, onDelete, onToggle, onDragStart }) {
+function TaskRow({ task, q, person, client, assigneeName, onEdit, onDelete, onToggle, onDragStart }) {
   const today = new Date().toISOString().split('T')[0]
   const done = task.status === 'completed'
   const isCancelled = task.status === 'cancelled'
@@ -60,6 +60,15 @@ function TaskRow({ task, q, person, assigneeName, onEdit, onDelete, onToggle, on
           {task.category && task.category !== 'geral' && (
             <span className={`chip ${q.chip}`}>{task.category}</span>
           )}
+          {client && (
+            <span
+              className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded"
+              style={{ color: client.color || '#8b5cf6', backgroundColor: `${client.color || '#8b5cf6'}18` }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: client.color || '#8b5cf6' }} />
+              {client.name.split(' ')[0]}
+            </span>
+          )}
           {person && (
             <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
               <User size={10} /> {person.name.split(' ')[0]}
@@ -91,12 +100,13 @@ function TaskRow({ task, q, person, assigneeName, onEdit, onDelete, onToggle, on
   )
 }
 
-export default function Matrix({ tasks, people = [], members = [], currentUserId = null, isManager = false, onNew, onEdit, onDelete, onToggle, onMoveTask }) {
+export default function Matrix({ tasks, people = [], clients = [], members = [], currentUserId = null, isManager = false, onNew, onEdit, onDelete, onToggle, onMoveTask }) {
   const today = new Date().toISOString().split('T')[0]
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPerson, setFilterPerson] = useState('')
   const [filterAssignee, setFilterAssignee] = useState('')
+  const [filterClient, setFilterClient] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -139,7 +149,7 @@ export default function Matrix({ tasks, people = [], members = [], currentUserId
   const memberName = id => members.find(m => m.user_id === id)?.name || null
   const showTeamFeatures = isManager && members.length > 1
   const categories = [...new Set(tasks.map(t => t.category).filter(c => c && c !== 'geral'))]
-  const hasFilters = search || filterCategory || filterPerson || filterAssignee || filterStatus || sortBy
+  const hasFilters = search || filterCategory || filterPerson || filterAssignee || filterClient || filterStatus || sortBy
 
   function applySort(list) {
     if (!sortBy) return list
@@ -172,6 +182,7 @@ export default function Matrix({ tasks, people = [], members = [], currentUserId
       if (filterCategory && t.category !== filterCategory) return false
       if (filterPerson && t.delegated_to !== filterPerson) return false
       if (filterAssignee && t.assigned_to !== filterAssignee) return false
+      if (filterClient && t.client_id !== filterClient) return false
       if (filterStatus && t.status !== filterStatus) return false
       return true
     })
@@ -194,7 +205,7 @@ export default function Matrix({ tasks, people = [], members = [], currentUserId
   }
 
   function clearFilters() {
-    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterAssignee(''); setFilterStatus(''); setSortBy('')
+    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterAssignee(''); setFilterClient(''); setFilterStatus(''); setSortBy('')
   }
 
   const SortSelect = ({ className = '' }) => (
@@ -227,6 +238,7 @@ export default function Matrix({ tasks, people = [], members = [], currentUserId
             <TaskRow
               key={t.id} task={t} q={q}
               person={t.delegated_to ? findPerson(t.delegated_to) : null}
+              client={t.client_id ? clients.find(c => c.id === t.client_id) : null}
               assigneeName={members.length > 1 && t.assigned_to && t.assigned_to !== currentUserId ? memberName(t.assigned_to) : null}
               onEdit={onEdit} onDelete={onDelete} onToggle={onToggle}
               onDragStart={handleDragStart}
@@ -284,6 +296,13 @@ export default function Matrix({ tasks, people = [], members = [], currentUserId
               ))}
             </select>
           )}
+          {clients.length > 0 && (
+            <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
+              value={filterClient} onChange={e => setFilterClient(e.target.value)}>
+              <option value="">Cliente</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
           <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
             value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             <option value="">Status</option>
@@ -334,6 +353,13 @@ export default function Matrix({ tasks, people = [], members = [], currentUserId
                 {members.map(m => (
                   <option key={m.user_id} value={m.user_id}>{m.user_id === currentUserId ? `${m.name} (você)` : m.name}</option>
                 ))}
+              </select>
+            )}
+            {clients.length > 0 && (
+              <select className="text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none flex-1"
+                value={filterClient} onChange={e => setFilterClient(e.target.value)}>
+                <option value="">Cliente</option>
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             )}
             <select className="text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none flex-1"

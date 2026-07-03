@@ -11,14 +11,14 @@ const RECURRENCE_LABELS = {
 
 // Modal de criação/edição de bloco.
 // defaultDate: 'YYYY-MM-DD' usado na criação; prefill pode trazer date/start/end (drag na grade).
-export default function BlockModal({ defaultDate, prefill, tasks, people, initialBlock, onSave, onUpdate, onClose }) {
+export default function BlockModal({ defaultDate, prefill, tasks, people, clients = [], initialBlock, onSave, onUpdate, onClose }) {
   const isEdit = !!initialBlock?.id
   const [error, setError] = useState('')
   const [form, setForm] = useState(() => {
     const base = {
       task_id: '', title: '', start_time: '09:00', end_time: '10:00',
       color: '#60a5fa', locked: false, recurrence: 'none', recurrence_end: '',
-      participants: [], date: defaultDate,
+      participants: [], client_id: '', date: defaultDate,
     }
     if (initialBlock) {
       return {
@@ -47,6 +47,16 @@ export default function BlockModal({ defaultDate, prefill, tasks, people, initia
     })
   }
 
+  function handleClientChange(e) {
+    const c = clients.find(c => c.id === e.target.value)
+    setForm(f => ({
+      ...f,
+      client_id: e.target.value,
+      // se a cor ainda é a padrão, adota a cor do cliente
+      color: c && f.color === '#60a5fa' ? (c.color || f.color) : f.color,
+    }))
+  }
+
   function handleSubmit(e) {
     e.preventDefault()
     if (form.start_time >= form.end_time) {
@@ -54,8 +64,9 @@ export default function BlockModal({ defaultDate, prefill, tasks, people, initia
       return
     }
     setError('')
-    if (isEdit) onUpdate({ ...form })
-    else onSave({ ...form })
+    const payload = { ...form, client_id: form.client_id || null }
+    if (isEdit) onUpdate(payload)
+    else onSave(payload)
   }
 
   return (
@@ -136,6 +147,18 @@ export default function BlockModal({ defaultDate, prefill, tasks, people, initia
                   )
                 })}
               </div>
+            </div>
+          )}
+
+          {clients.length > 0 && (
+            <div>
+              <label className="label">Cliente</label>
+              <select className="input" value={form.client_id || ''} onChange={handleClientChange}>
+                <option value="">— sem cliente —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}{c.company ? ` · ${c.company}` : ''}</option>
+                ))}
+              </select>
             </div>
           )}
 

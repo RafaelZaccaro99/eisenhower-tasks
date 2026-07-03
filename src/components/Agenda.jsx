@@ -41,12 +41,13 @@ function ScopeDialog({ mode, blockTitle, onSingle, onSeries, onClose }) {
   )
 }
 
-export default function Agenda({ tasks, people = [], externalEvents = [], blocksApi, onCreateGoogleEvent, onEditTask }) {
+export default function Agenda({ tasks, people = [], clients = [], externalEvents = [], blocksApi, onCreateGoogleEvent, onEditTask }) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('eisenhower-agenda-view') || 'day')
   const [showPanel, setShowPanel] = useState(() => localStorage.getItem('eisenhower-agenda-panel') === '1')
   const [placingTask, setPlacingTask] = useState(null)
+  const [filterClient, setFilterClient] = useState('')
   const [modal, setModal] = useState(null)          // null | {type:'new', prefill?} | {type:'edit', block}
   const [scopeAsk, setScopeAsk] = useState(null)    // null | { mode: 'edit'|'delete', block, patch? }
 
@@ -65,6 +66,7 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
   const rangeEnd = isWeek ? weekEndStr : selectedDateStr
 
   const occurrences = occurrencesFor(rangeStart, rangeEnd)
+    .filter(b => !filterClient || b.client_id === filterClient)
 
   const days = (isWeek ? weekDays : [selectedDate]).map(d => {
     const ds = format(d, 'yyyy-MM-dd')
@@ -222,6 +224,16 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          {clients.length > 0 && (
+            <select
+              className="hidden sm:block text-xs border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
+              value={filterClient}
+              onChange={e => setFilterClient(e.target.value)}
+            >
+              <option value="">Cliente</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
           {/* Toggle Dia | Semana */}
           <div className="flex rounded-md border border-notion-border overflow-hidden text-xs">
             <button
@@ -405,6 +417,7 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
           prefill={modal.prefill}
           tasks={tasks}
           people={people}
+          clients={clients}
           initialBlock={modal.type === 'edit' ? modal.block : null}
           onSave={handleSaveNew}
           onUpdate={handleUpdateRequest}

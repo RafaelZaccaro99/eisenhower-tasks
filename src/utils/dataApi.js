@@ -125,6 +125,12 @@ export const dataApi = {
     },
     deleteByIntegration: (id) => sb(`/external_events?integration_id=eq.${id}`, 'DELETE'),
   },
+  clients: {
+    list:   ()         => sb(`/clients?order=name.asc&archived=eq.false${wsFilter()}`),
+    create: (body)     => sb('/clients', 'POST', { ...stamp(body), created_by: getUserId() }),
+    update: (id, body) => sb(`/clients?id=eq.${id}`, 'PATCH', body),
+    delete: (id)       => sb(`/clients?id=eq.${id}`, 'DELETE'),
+  },
   workspaces: {
     bootstrap: ()    => sb('/rpc/bootstrap_workspace', 'POST', {}),
     directory: (ws)  => sb('/rpc/workspace_directory', 'POST', { ws }),

@@ -13,7 +13,7 @@ function lsWrite(blocks) { localStorage.setItem('eisenhower-blocks', JSON.string
 const BLOCK_DEFAULTS = {
   task_id: '', title: '', start_time: '09:00', end_time: '10:00',
   color: '#60a5fa', locked: false, recurrence: 'none', recurrence_end: '',
-  participants: [], recurrence_exceptions: [],
+  participants: [], recurrence_exceptions: [], client_id: null,
 }
 
 export function useBlocks() {

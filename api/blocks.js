@@ -31,6 +31,7 @@ module.exports = async (req, res) => {
         recurrence_end: d.recurrence_end || null,
         participants: Array.isArray(d.participants) ? d.participants : [],
         recurrence_exceptions: Array.isArray(d.recurrence_exceptions) ? d.recurrence_exceptions : [],
+        client_id: d.client_id || null,
       }
       const created = await sb('/blocks', 'POST', row, token)
       return res.status(201).json(Array.isArray(created) ? created[0] : created)
