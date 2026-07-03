@@ -14,6 +14,7 @@ import { usePeople } from './hooks/usePeople'
 import { useBlocks } from './hooks/useBlocks'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
+import { useWorkspace } from './hooks/useWorkspace'
 import { useNotifications } from './hooks/useNotifications'
 import { useIntegrations } from './hooks/useIntegrations'
 import { setUnauthorizedHandler } from './utils/dataApi'
@@ -28,13 +29,36 @@ const VIEWS = [
 ]
 
 export default function App() {
+  const auth = useAuth()
+  const { user, accessToken, loading: authLoading, signIn, signUp, refreshSession } = auth
+  useEffect(() => { setProxyToken(accessToken || '') }, [accessToken])
+  useEffect(() => { setUnauthorizedHandler(refreshSession) }, [refreshSession])
+
+  // Resolve o workspace ANTES de montar os hooks de dados — garante que
+  // os lists/creates já saiam carimbados com o workspace correto.
+  const ws = useWorkspace(user)
+
+  if (authLoading || (user && ws.loading)) {
+    return (
+      <div className="h-[100dvh] flex items-center justify-center text-notion-muted text-sm">
+        Carregando...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
+  }
+
+  return <MainApp auth={auth} ws={ws} />
+}
+
+function MainApp({ auth, ws }) {
   const [view, setView] = useState('matrix')
   const [modal, setModal] = useState(null)
   const [chatOpen, setChatOpen] = useState(false)
 
-  const { user, accessToken, loading: authLoading, signIn, signUp, signOut, refreshSession } = useAuth()
-  useEffect(() => { setProxyToken(accessToken || '') }, [accessToken])
-  useEffect(() => { setUnauthorizedHandler(refreshSession) }, [refreshSession])
+  const { user, accessToken, signOut } = auth
   const { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
   const blocksApi = useBlocks()
@@ -45,6 +69,9 @@ export default function App() {
     createIntegration, deleteIntegration, syncIntegration, updateIntegration,
     connectOAuth, createGoogleEvent, createClickupTask, createJiraIssue,
   } = useIntegrations(accessToken)
+
+  const currentUserId = user?.id
+  const activeMembers = ws.members.filter(m => m.status === 'active')
 
   // Handle OAuth callback redirect params
   useEffect(() => {
@@ -86,18 +113,6 @@ export default function App() {
 
   const createBlock = blocksApi.createBlock
 
-  if (authLoading) {
-    return (
-      <div className="h-[100dvh] flex items-center justify-center text-notion-muted text-sm">
-        Carregando...
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
-  }
-
   if (!settings.onboardingCompleted) {
     return <Onboarding onComplete={data => saveAnamnesis(data)} />
   }
@@ -134,12 +149,17 @@ export default function App() {
       <header className="flex items-center justify-between px-4 md:px-6 h-12 border-b border-notion-border flex-shrink-0">
         <div className="flex items-center gap-2 md:gap-4">
           <span className="text-sm font-semibold text-notion-text tracking-tight">Eisenhower</span>
+          {ws.workspace && ws.workspace.memberCount > 1 && (
+            <span className="hidden sm:inline text-xs text-notion-muted max-w-[120px] truncate" title={ws.workspace.name}>
+              {ws.workspace.name}
+            </span>
+          )}
           <span className="hidden sm:inline text-xs text-notion-muted">{pending} pendente{pending !== 1 ? 's' : ''}</span>
           {serverMode ? (
             <span className="hidden sm:inline text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-md font-medium">
               ⬡ MCP
             </span>
-          ) : !authLoading && user && (
+          ) : (
             <span className="hidden sm:inline text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md font-medium">
               ⚡ offline
             </span>
@@ -209,6 +229,9 @@ export default function App() {
         ) : view === 'matrix' ? (
           <Matrix
             tasks={tasks} people={people}
+            members={activeMembers}
+            currentUserId={currentUserId}
+            isManager={ws.isManager}
             onNew={openNew}
             onEdit={task => setModal({ task })}
             onDelete={deleteTask}
@@ -231,7 +254,11 @@ export default function App() {
             onCreate={createPerson} onUpdate={updatePerson} onDelete={deletePerson}
           />
         ) : view === 'history' ? (
-          <History tasks={tasks} statusHistory={statusHistory} onDelete={deleteTask} onToggle={toggleStatus} />
+          <History
+            tasks={tasks} statusHistory={statusHistory}
+            members={activeMembers} currentUserId={currentUserId} isManager={ws.isManager}
+            onDelete={deleteTask} onToggle={toggleStatus}
+          />
         ) : (
           <Settings
             settings={settings}
@@ -254,6 +281,14 @@ export default function App() {
             onUpdateIntegrationConfig={(id, configPatch) =>
               updateIntegration(id, { config: { ...(integrations.find(i => i.id === id)?.config || {}), ...configPatch } })
             }
+            workspace={ws.workspace}
+            members={ws.members}
+            workspaceRole={ws.role}
+            currentUserId={currentUserId}
+            onInviteMember={ws.invite}
+            onUpdateMemberRole={ws.updateMemberRole}
+            onRemoveMember={ws.removeMember}
+            onRenameWorkspace={ws.renameWorkspace}
           />
         )}
       </main>
@@ -280,6 +315,9 @@ export default function App() {
         <TaskModal
           task={modal.task}
           people={people}
+          members={activeMembers}
+          currentUserId={currentUserId}
+          isManager={ws.isManager}
           assistantEnabled={settings.assistantEnabled}
           aiConfig={aiConfig}
           anamnesis={settings.anamnesis}

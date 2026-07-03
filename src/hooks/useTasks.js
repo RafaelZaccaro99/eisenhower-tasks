@@ -93,6 +93,7 @@ export function useTasks() {
       due_date: data.due_date || null,
       category: data.category || 'geral',
       delegated_to: data.delegated_to || null,
+      assigned_to: data.assigned_to || null,
       recurrence: data.recurrence || null,
       recurrence_end: data.recurrence_end || null,
     }
@@ -116,6 +117,8 @@ export function useTasks() {
       recurrence: data.recurrence || null,
       recurrence_end: data.recurrence_end || null,
     }
+    // Não sobrescrever o responsável com valor vazio
+    if (!patch.assigned_to) delete patch.assigned_to
 
     // Record status transition if status changed
     const existing = tasksRef.current.find(t => t.id === data.id)

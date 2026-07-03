@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Zap, RotateCcw, X, ChevronRight, Eye, EyeOff, Bot, Hash } from 'lucide-react'
 import { PROVIDERS } from '../utils/aiClassifier'
 import IntegrationsSettings from './IntegrationsSettings'
+import TeamSettings from './TeamSettings'
 
 function SlackIcon({ size = 14 }) {
   return (
@@ -66,7 +67,12 @@ function TagEditor({ label, tags, onChange, placeholder }) {
   )
 }
 
-export default function Settings({ settings, onSave, onRestartOnboarding, integrations = [], integrationsLoading, onAddIntegration, onDeleteIntegration, onSyncIntegration, onConnectOAuth, onUpdateIntegrationConfig }) {
+export default function Settings({
+  settings, onSave, onRestartOnboarding,
+  integrations = [], integrationsLoading, onAddIntegration, onDeleteIntegration, onSyncIntegration, onConnectOAuth, onUpdateIntegrationConfig,
+  workspace, members = [], workspaceRole, currentUserId,
+  onInviteMember, onUpdateMemberRole, onRemoveMember, onRenameWorkspace,
+}) {
   const [local, setLocal] = useState(settings.anamnesis)
   const set = (k, v) => setLocal(d => ({ ...d, [k]: v }))
   const [saved, setSaved] = useState(false)
@@ -281,6 +287,18 @@ export default function Settings({ settings, onSave, onRestartOnboarding, integr
             </div>
           </div>
         </section>
+
+        {/* Equipe */}
+        <TeamSettings
+          workspace={workspace}
+          members={members}
+          role={workspaceRole}
+          currentUserId={currentUserId}
+          onInvite={onInviteMember}
+          onUpdateMemberRole={onUpdateMemberRole}
+          onRemoveMember={onRemoveMember}
+          onRename={onRenameWorkspace}
+        />
 
         {/* Integrações */}
         <IntegrationsSettings

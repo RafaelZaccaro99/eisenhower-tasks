@@ -11,7 +11,7 @@ const QUADRANTS = [
   { key: 'q4', label: 'Eliminar',     sub: 'Não urgente · Não importante', dot: 'bg-notion-border2', chip: 'bg-notion-surface text-notion-muted', urgent: false, important: false },
 ]
 
-function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
+function TaskRow({ task, q, person, assigneeName, onEdit, onDelete, onToggle, onDragStart }) {
   const today = new Date().toISOString().split('T')[0]
   const done = task.status === 'completed'
   const isCancelled = task.status === 'cancelled'
@@ -19,6 +19,9 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
   const isDueToday = !done && !isCancelled && task.due_date === today
   const hasRecurrence = task.recurrence && task.recurrence !== 'none'
   const statusCfg = STATUS_CONFIG[task.status]
+  const assigneeInitials = assigneeName
+    ? assigneeName.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+    : null
 
   return (
     <div
@@ -62,6 +65,14 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
               <User size={10} /> {person.name.split(' ')[0]}
             </span>
           )}
+          {assigneeInitials && (
+            <span
+              title={`Responsável: ${assigneeName}`}
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-notion-hover text-notion-sub text-[8px] font-bold flex-shrink-0"
+            >
+              {assigneeInitials}
+            </span>
+          )}
           {statusCfg && task.status !== 'pending' && task.status !== 'completed' && (
             <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${statusCfg.bg} ${statusCfg.color}`}>
               {statusCfg.label}
@@ -80,11 +91,12 @@ function TaskRow({ task, q, person, onEdit, onDelete, onToggle, onDragStart }) {
   )
 }
 
-export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, onToggle, onMoveTask }) {
+export default function Matrix({ tasks, people = [], members = [], currentUserId = null, isManager = false, onNew, onEdit, onDelete, onToggle, onMoveTask }) {
   const today = new Date().toISOString().split('T')[0]
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterPerson, setFilterPerson] = useState('')
+  const [filterAssignee, setFilterAssignee] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -124,8 +136,10 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   }
 
   const findPerson = id => people.find(p => p.id === id)
+  const memberName = id => members.find(m => m.user_id === id)?.name || null
+  const showTeamFeatures = isManager && members.length > 1
   const categories = [...new Set(tasks.map(t => t.category).filter(c => c && c !== 'geral'))]
-  const hasFilters = search || filterCategory || filterPerson || filterStatus || sortBy
+  const hasFilters = search || filterCategory || filterPerson || filterAssignee || filterStatus || sortBy
 
   function applySort(list) {
     if (!sortBy) return list
@@ -157,6 +171,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
       if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false
       if (filterCategory && t.category !== filterCategory) return false
       if (filterPerson && t.delegated_to !== filterPerson) return false
+      if (filterAssignee && t.assigned_to !== filterAssignee) return false
       if (filterStatus && t.status !== filterStatus) return false
       return true
     })
@@ -179,7 +194,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
   }
 
   function clearFilters() {
-    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterStatus(''); setSortBy('')
+    setSearch(''); setFilterCategory(''); setFilterPerson(''); setFilterAssignee(''); setFilterStatus(''); setSortBy('')
   }
 
   const SortSelect = ({ className = '' }) => (
@@ -212,6 +227,7 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
             <TaskRow
               key={t.id} task={t} q={q}
               person={t.delegated_to ? findPerson(t.delegated_to) : null}
+              assigneeName={members.length > 1 && t.assigned_to && t.assigned_to !== currentUserId ? memberName(t.assigned_to) : null}
               onEdit={onEdit} onDelete={onDelete} onToggle={onToggle}
               onDragStart={handleDragStart}
             />
@@ -259,6 +275,15 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
               {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
             </select>
           )}
+          {showTeamFeatures && (
+            <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
+              value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
+              <option value="">Responsável</option>
+              {members.map(m => (
+                <option key={m.user_id} value={m.user_id}>{m.user_id === currentUserId ? `${m.name} (você)` : m.name}</option>
+              ))}
+            </select>
+          )}
           <select className="hidden md:block text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none"
             value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             <option value="">Status</option>
@@ -300,6 +325,15 @@ export default function Matrix({ tasks, people = [], onNew, onEdit, onDelete, on
                 value={filterPerson} onChange={e => setFilterPerson(e.target.value)}>
                 <option value="">Pessoa</option>
                 {people.map(p => <option key={p.id} value={p.id}>{p.name.split(' ')[0]}</option>)}
+              </select>
+            )}
+            {showTeamFeatures && (
+              <select className="text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none flex-1"
+                value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}>
+                <option value="">Responsável</option>
+                {members.map(m => (
+                  <option key={m.user_id} value={m.user_id}>{m.user_id === currentUserId ? `${m.name} (você)` : m.name}</option>
+                ))}
               </select>
             )}
             <select className="text-sm border border-notion-border rounded-md px-2 py-1.5 bg-notion-surface text-notion-sub focus:outline-none flex-1"
