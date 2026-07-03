@@ -2,14 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import { isServerUp, dataApi } from '../utils/dataApi'
 import { calcQuadrant } from '../utils/statusConfig'
-
-function nextDueDate(dueDate, recurrence) {
-  const d = new Date(dueDate + 'T00:00:00')
-  if (recurrence === 'daily') d.setDate(d.getDate() + 1)
-  else if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
-  else if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
-  return d.toISOString().split('T')[0]
-}
+import { nextDueDate } from '../utils/recurrence'
 
 const ipc = window.api?.tasks
 

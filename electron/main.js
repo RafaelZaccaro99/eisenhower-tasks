@@ -84,6 +84,11 @@ ipcMain.handle('tasks:delete', (_, id) => {
 })
 
 // ── Agenda Blocks ─────────────────────────────────────────
+ipcMain.handle('agenda:getAll', () => {
+  const db = readDb()
+  return db.blocks
+})
+
 ipcMain.handle('agenda:getByDate', (_, date) => {
   const db = readDb()
   return db.blocks.filter(b => b.date === date).sort((a, b) => a.start_time.localeCompare(b.start_time))

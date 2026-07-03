@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Lock, Repeat, Pencil, ExternalLink as ExternalLinkIcon, User, Users } from 'lucide-react'
-import { format, addDays, startOfWeek, isSameDay, isToday, parseISO } from 'date-fns'
+import React, { useState } from 'react'
+import { ChevronLeft, ChevronRight, Plus, X, Lock, Repeat, Pencil, ExternalLink as ExternalLinkIcon, User, Users, AlertCircle } from 'lucide-react'
+import { format, addDays, startOfWeek, isSameDay, isToday } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { v4 as uuidv4 } from 'uuid'
-import { isServerUp, dataApi } from '../utils/dataApi'
 import { DONE_STATUSES, STATUS_CONFIG } from '../utils/statusConfig'
 
 const Q_COLORS = { q1: '#f87171', q2: '#60a5fa', q3: '#fbbf24', q4: '#9b9a97' }
-const Q_LABELS = { q1: 'Urgente', q2: 'Importante', q3: 'Delegar', q4: 'Eliminar' }
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
 const pad = n => String(n).padStart(2, '0')
 
@@ -18,20 +15,12 @@ const RECURRENCE_LABELS = {
   monthly: 'Mensalmente',
 }
 
-function recurrenceMatchesDate(block, dateStr) {
-  if (!block.recurrence || block.recurrence === 'none') return block.date === dateStr
-  const origin = parseISO(block.date)
-  const target = parseISO(dateStr)
-  if (target < origin) return false
-  if (block.recurrence_end && dateStr > block.recurrence_end) return false
-  if (block.recurrence === 'daily') return true
-  if (block.recurrence === 'weekly') return origin.getDay() === target.getDay()
-  if (block.recurrence === 'monthly') return origin.getDate() === target.getDate()
-  return false
-}
-
 function initials(name) {
   return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
+}
+
+function isRecurring(block) {
+  return block.recurrence && block.recurrence !== 'none'
 }
 
 function ParticipantBubbles({ ids, people, max = 3 }) {
@@ -40,7 +29,7 @@ function ParticipantBubbles({ ids, people, max = 3 }) {
   const shown = matched.slice(0, max)
   const rest = matched.length - max
   return (
-    <div className="flex items-center" style={{ gap: -4 }}>
+    <div className="flex items-center">
       {shown.map((p, i) => (
         <span
           key={p.id}
@@ -60,8 +49,37 @@ function ParticipantBubbles({ ids, people, max = 3 }) {
   )
 }
 
+// Pergunta se a ação vale só para a ocorrência do dia ou para a série inteira
+function ScopeDialog({ mode, blockTitle, onSingle, onSeries, onClose }) {
+  const isDelete = mode === 'delete'
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: 'rgba(15,15,15,0.4)' }} onClick={onClose}>
+      <div className="bg-white rounded-xl w-full max-w-sm p-5 flex flex-col gap-3" onClick={e => e.stopPropagation()}
+        style={{ boxShadow: '0 8px 40px rgba(15,15,15,0.12)' }}>
+        <div className="flex items-center gap-2">
+          <Repeat size={15} className="text-notion-muted" />
+          <h3 className="text-sm font-semibold text-notion-text">
+            {isDelete ? 'Excluir bloco recorrente' : 'Editar bloco recorrente'}
+          </h3>
+        </div>
+        <p className="text-xs text-notion-muted">
+          "{blockTitle}" se repete. {isDelete ? 'O que você quer excluir?' : 'Onde aplicar a alteração?'}
+        </p>
+        <button onClick={onSingle} className="btn-ghost justify-start border border-notion-border rounded-md px-3 py-2 text-sm">
+          Somente esta ocorrência
+        </button>
+        <button onClick={onSeries} className={`btn-ghost justify-start border border-notion-border rounded-md px-3 py-2 text-sm ${isDelete ? 'text-red-500 hover:text-red-600' : ''}`}>
+          Toda a série
+        </button>
+        <button onClick={onClose} className="text-xs text-notion-muted hover:text-notion-text mt-1">Cancelar</button>
+      </div>
+    </div>
+  )
+}
+
 function BlockModal({ date, tasks, people, initialBlock, onSave, onUpdate, onClose }) {
   const isEdit = !!initialBlock?.id
+  const [error, setError] = useState('')
   const [form, setForm] = useState(() => {
     const base = {
       task_id: '', title: '', start_time: '09:00', end_time: '10:00',
@@ -95,10 +113,15 @@ function BlockModal({ date, tasks, people, initialBlock, onSave, onUpdate, onClo
 
   function handleSubmit(e) {
     e.preventDefault()
+    if (form.start_time >= form.end_time) {
+      setError('O horário final deve ser depois do inicial')
+      return
+    }
+    setError('')
     if (isEdit) {
       onUpdate({ ...form })
     } else {
-      onSave({ id: uuidv4(), ...form, date: format(date, 'yyyy-MM-dd') })
+      onSave({ ...form, date: format(date, 'yyyy-MM-dd') })
     }
   }
 
@@ -148,6 +171,12 @@ function BlockModal({ date, tasks, people, initialBlock, onSave, onUpdate, onClo
             </div>
           </div>
 
+          {error && (
+            <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
+              <AlertCircle size={12} /> {error}
+            </div>
+          )}
+
           {/* Participants */}
           {people.length > 0 && (
             <div>
@@ -181,7 +210,6 @@ function BlockModal({ date, tasks, people, initialBlock, onSave, onUpdate, onClo
             </div>
           </div>
 
-          {/* Recurrence — shown for both new and edit */}
           <div>
             <label className="label flex items-center gap-1"><Repeat size={12} /> Recorrência</label>
             <select className="input" value={form.recurrence} onChange={e => set('recurrence', e.target.value)}>
@@ -284,7 +312,7 @@ function TimeGrid({ blocks, externalEvents, people, onDeleteBlock, onEditBlock }
           >
             <div className="flex items-center gap-1">
               {block.locked && <Lock size={9} className="flex-shrink-0 opacity-80" />}
-              {(block.recurrence && block.recurrence !== 'none') && <Repeat size={9} className="flex-shrink-0 opacity-80" />}
+              {isRecurring(block) && <Repeat size={9} className="flex-shrink-0 opacity-80" />}
               <p className="font-medium truncate leading-tight flex-1">{block.title}</p>
               {participants.length > 0 && (
                 <ParticipantBubbles ids={participants} people={people} max={3} />
@@ -305,7 +333,7 @@ function TimeGrid({ blocks, externalEvents, people, onDeleteBlock, onEditBlock }
               </button>
               {!block.locked && (
                 <button
-                  onClick={e => { e.stopPropagation(); onDeleteBlock(block.id) }}
+                  onClick={e => { e.stopPropagation(); onDeleteBlock(block) }}
                   className="hover:opacity-80"
                 >
                   <X size={10} />
@@ -322,86 +350,66 @@ function TimeGrid({ blocks, externalEvents, people, onDeleteBlock, onEditBlock }
   )
 }
 
-export default function Agenda({ tasks, people = [], externalEvents = [], onCreateGoogleEvent, onEditTask }) {
+export default function Agenda({ tasks, people = [], externalEvents = [], blocksApi, onCreateGoogleEvent, onEditTask }) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
-  const [blocks, setBlocks] = useState([])
-  const [modal, setModal] = useState(null) // null | 'new' | block object (for edit)
-  const [serverMode, setServerMode] = useState(false)
+  const [modal, setModal] = useState(null)          // null | 'new' | occurrence (edição)
+  const [scopeAsk, setScopeAsk] = useState(null)    // null | { mode: 'edit'|'delete', block, patch? }
 
-  const ipc = window.api?.agenda
-
-  function lsReadBlocks() {
-    try { return JSON.parse(localStorage.getItem('eisenhower-blocks') || '[]') } catch { return [] }
-  }
-  function lsWriteBlocks(b) { localStorage.setItem('eisenhower-blocks', JSON.stringify(b)) }
-
-  async function loadBlocks(date) {
-    const dateStr = format(date, 'yyyy-MM-dd')
-    if (ipc) {
-      setBlocks(await ipc.getByDate(dateStr))
-      return
-    }
-    const up = await isServerUp()
-    setServerMode(up)
-    if (up) {
-      const all = await dataApi.blocks.list()
-      setBlocks(all.filter(b => recurrenceMatchesDate(b, dateStr)))
-    } else {
-      const all = lsReadBlocks()
-      setBlocks(all.filter(b => recurrenceMatchesDate(b, dateStr)))
-    }
-  }
-
-  useEffect(() => { loadBlocks(selectedDate) }, [selectedDate])
-
-  async function handleSaveBlock(block) {
-    if (ipc) {
-      await ipc.create(block)
-    } else if (serverMode) {
-      await dataApi.blocks.create(block)
-    } else {
-      lsWriteBlocks([...lsReadBlocks(), block])
-    }
-    await loadBlocks(selectedDate)
-    setModal(null)
-  }
-
-  async function handleUpdateBlock(block) {
-    if (ipc) {
-      await ipc.update(block)
-    } else if (serverMode) {
-      await dataApi.blocks.update(block.id, block)
-    } else {
-      const all = lsReadBlocks()
-      const idx = all.findIndex(b => b.id === block.id)
-      if (idx !== -1) all[idx] = block
-      lsWriteBlocks(all)
-    }
-    await loadBlocks(selectedDate)
-    setModal(null)
-  }
-
-  async function handleDeleteBlock(id) {
-    if (ipc) {
-      await ipc.delete(id)
-    } else if (serverMode) {
-      await dataApi.blocks.delete(id)
-    } else {
-      const all = lsReadBlocks()
-      const block = all.find(b => b.id === id)
-      if (block?.locked) return
-      lsWriteBlocks(all.filter(b => b.id !== id))
-    }
-    await loadBlocks(selectedDate)
-  }
+  const { occurrencesFor, createBlock, updateBlock, deleteBlock } = blocksApi
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
+  const dayBlocks = occurrencesFor(selectedDateStr, selectedDateStr)
+
+  async function handleSaveNew(form) {
+    await createBlock(form)
+    setModal(null)
+  }
+
+  // Edição vinda do modal: se a série é recorrente, pergunta o escopo
+  function handleUpdateRequest(form) {
+    const occurrence = modal
+    if (isRecurring(occurrence)) {
+      setModal(null)
+      setScopeAsk({ mode: 'edit', block: occurrence, patch: form })
+    } else {
+      updateBlock(occurrence, form).then(() => setModal(null))
+    }
+  }
+
+  function handleDeleteRequest(occurrence) {
+    if (isRecurring(occurrence)) {
+      setScopeAsk({ mode: 'delete', block: occurrence })
+    } else {
+      deleteBlock(occurrence)
+    }
+  }
+
+  async function resolveScope(scope) {
+    const { mode, block, patch } = scopeAsk
+    setScopeAsk(null)
+    if (mode === 'edit') {
+      if (scope === 'single') {
+        await updateBlock(block, patch, { scope: 'single', date: block.date })
+      } else {
+        const seriesPatch = { ...patch }
+        delete seriesPatch.id
+        delete seriesPatch.date // preserva a data de origem da série
+        await updateBlock(block, seriesPatch)
+      }
+    } else {
+      if (scope === 'single') {
+        await deleteBlock(block, { scope: 'single', date: block.date })
+      } else {
+        await deleteBlock(block)
+      }
+    }
+  }
+
   const dayExternalEvents = externalEvents.filter(e => e.date === selectedDateStr)
   const allDayEvents = dayExternalEvents.filter(e => e.all_day || !e.start_time)
   const timedExternalEvents = dayExternalEvents.filter(e => !e.all_day && e.start_time)
 
-  // Tasks due on selected day
   const dueTasks = tasks.filter(t => t.due_date === selectedDateStr && !DONE_STATUSES.includes(t.status))
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -452,7 +460,7 @@ export default function Agenda({ tasks, people = [], externalEvents = [], onCrea
             {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
           </h2>
           <p className="text-xs text-notion-muted">
-            {blocks.length} bloco{blocks.length !== 1 ? 's' : ''}
+            {dayBlocks.length} bloco{dayBlocks.length !== 1 ? 's' : ''}
             {dueTasks.length > 0 && ` · ${dueTasks.length} tarefa${dueTasks.length !== 1 ? 's' : ''}`}
             {dayExternalEvents.length > 0 && ` · ${dayExternalEvents.length} externo${dayExternalEvents.length !== 1 ? 's' : ''}`}
           </p>
@@ -529,10 +537,10 @@ export default function Agenda({ tasks, people = [], externalEvents = [], onCrea
       {/* Grid */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <TimeGrid
-          blocks={blocks}
+          blocks={dayBlocks}
           externalEvents={timedExternalEvents}
           people={people}
-          onDeleteBlock={handleDeleteBlock}
+          onDeleteBlock={handleDeleteRequest}
           onEditBlock={block => setModal(block)}
         />
       </div>
@@ -543,9 +551,19 @@ export default function Agenda({ tasks, people = [], externalEvents = [], onCrea
           tasks={tasks}
           people={people}
           initialBlock={modal === 'new' ? null : modal}
-          onSave={handleSaveBlock}
-          onUpdate={handleUpdateBlock}
+          onSave={handleSaveNew}
+          onUpdate={handleUpdateRequest}
           onClose={() => setModal(null)}
+        />
+      )}
+
+      {scopeAsk && (
+        <ScopeDialog
+          mode={scopeAsk.mode}
+          blockTitle={scopeAsk.block.title}
+          onSingle={() => resolveScope('single')}
+          onSeries={() => resolveScope('series')}
+          onClose={() => setScopeAsk(null)}
         />
       )}
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut, MessageCircle } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
@@ -11,13 +11,13 @@ import Onboarding from './components/Onboarding'
 import AuthScreen from './components/AuthScreen'
 import { useTasks } from './hooks/useTasks'
 import { usePeople } from './hooks/usePeople'
+import { useBlocks } from './hooks/useBlocks'
 import { useSettings } from './hooks/useSettings'
 import { useAuth } from './hooks/useAuth'
 import { useNotifications } from './hooks/useNotifications'
 import { useIntegrations } from './hooks/useIntegrations'
-import { isServerUp, dataApi, setUnauthorizedHandler } from './utils/dataApi'
+import { setUnauthorizedHandler } from './utils/dataApi'
 import { setProxyToken } from './utils/aiProxy'
-import { v4 as uuidv4 } from 'uuid'
 
 const VIEWS = [
   { key: 'matrix',   label: 'Matriz',        icon: LayoutGrid   },
@@ -37,6 +37,7 @@ export default function App() {
   useEffect(() => { setUnauthorizedHandler(refreshSession) }, [refreshSession])
   const { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus } = useTasks()
   const { people, createPerson, updatePerson, deletePerson } = usePeople()
+  const blocksApi = useBlocks()
   const { settings, save, saveAnamnesis } = useSettings(accessToken)
   useNotifications(tasks, loading)
   const {
@@ -83,21 +84,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [modal, view])
 
-  const createBlock = useCallback(async (data) => {
-    const block = { id: uuidv4(), recurrence: 'none', recurrence_end: '', color: '#60a5fa', locked: false, task_id: '', ...data }
-    const ipc = window.api?.agenda
-    if (ipc) {
-      await ipc.create(block)
-      return
-    }
-    const up = await isServerUp()
-    if (up) {
-      await dataApi.blocks.create(block)
-    } else {
-      const all = JSON.parse(localStorage.getItem('eisenhower-blocks') || '[]')
-      localStorage.setItem('eisenhower-blocks', JSON.stringify([...all, block]))
-    }
-  }, [])
+  const createBlock = blocksApi.createBlock
 
   if (authLoading) {
     return (
@@ -233,6 +220,7 @@ export default function App() {
             tasks={tasks}
             people={people}
             externalEvents={externalEvents}
+            blocksApi={blocksApi}
             onCreateGoogleEvent={integrations.some(i => i.provider === 'google') ? createGoogleEvent : null}
             onEditTask={task => setModal({ task })}
           />
