@@ -1,52 +1,16 @@
-import React, { useState } from 'react'
-import { ChevronLeft, ChevronRight, Plus, X, Lock, Repeat, Pencil, ExternalLink as ExternalLinkIcon, User, Users, AlertCircle } from 'lucide-react'
-import { format, addDays, startOfWeek, isSameDay, isToday } from 'date-fns'
+import React, { useState, useEffect } from 'react'
+import { ChevronLeft, ChevronRight, Plus, Repeat, ExternalLink as ExternalLinkIcon, User, ListTodo } from 'lucide-react'
+import { format, addDays, startOfWeek, isSameDay, isToday, differenceInCalendarDays, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import { DONE_STATUSES, STATUS_CONFIG } from '../utils/statusConfig'
+import { DONE_STATUSES, STATUS_CONFIG, Q_COLORS } from '../utils/statusConfig'
+import TimeGrid, { minutesToHHMM, hhmmToMinutes } from './agenda/TimeGrid'
+import BlockModal from './agenda/BlockModal'
+import TaskPanel from './agenda/TaskPanel'
 
-const Q_COLORS = { q1: '#f87171', q2: '#60a5fa', q3: '#fbbf24', q4: '#9b9a97' }
-const HOURS = Array.from({ length: 24 }, (_, i) => i)
-const pad = n => String(n).padStart(2, '0')
-
-const RECURRENCE_LABELS = {
-  none: 'Não repete',
-  daily: 'Diariamente',
-  weekly: 'Semanalmente',
-  monthly: 'Mensalmente',
-}
-
-function initials(name) {
-  return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase()
-}
+const PROVIDER_ICONS = { google: '🔵', clickup: '🟣', jira: '🔷', ical: '📅' }
 
 function isRecurring(block) {
   return block.recurrence && block.recurrence !== 'none'
-}
-
-function ParticipantBubbles({ ids, people, max = 3 }) {
-  const matched = ids.map(id => people.find(p => p.id === id)).filter(Boolean)
-  if (!matched.length) return null
-  const shown = matched.slice(0, max)
-  const rest = matched.length - max
-  return (
-    <div className="flex items-center">
-      {shown.map((p, i) => (
-        <span
-          key={p.id}
-          title={p.name}
-          className="inline-flex items-center justify-center w-4 h-4 rounded-full text-white text-[8px] font-bold border border-white flex-shrink-0"
-          style={{ backgroundColor: '#6b7280', marginLeft: i > 0 ? -4 : 0, zIndex: i }}
-        >
-          {initials(p.name)}
-        </span>
-      ))}
-      {rest > 0 && (
-        <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-400 text-white text-[8px] font-bold border border-white flex-shrink-0" style={{ marginLeft: -4 }}>
-          +{rest}
-        </span>
-      )}
-    </div>
-  )
 }
 
 // Pergunta se a ação vale só para a ocorrência do dia ou para a série inteira
@@ -77,298 +41,49 @@ function ScopeDialog({ mode, blockTitle, onSingle, onSeries, onClose }) {
   )
 }
 
-function BlockModal({ date, tasks, people, initialBlock, onSave, onUpdate, onClose }) {
-  const isEdit = !!initialBlock?.id
-  const [error, setError] = useState('')
-  const [form, setForm] = useState(() => {
-    const base = {
-      task_id: '', title: '', start_time: '09:00', end_time: '10:00',
-      color: '#60a5fa', locked: false, recurrence: 'none', recurrence_end: '',
-      participants: [],
-    }
-    if (!initialBlock) return base
-    return {
-      ...base,
-      ...initialBlock,
-      participants: Array.isArray(initialBlock.participants) ? initialBlock.participants : [],
-    }
-  })
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
-
-  function handleTaskChange(e) {
-    const t = tasks.find(t => t.id === e.target.value)
-    setForm(f => ({
-      ...f, task_id: e.target.value,
-      title: t ? t.title : f.title,
-      color: t ? Q_COLORS[t.quadrant] : f.color,
-    }))
-  }
-
-  function toggleParticipant(id) {
-    setForm(f => {
-      const list = f.participants || []
-      return { ...f, participants: list.includes(id) ? list.filter(x => x !== id) : [...list, id] }
-    })
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    if (form.start_time >= form.end_time) {
-      setError('O horário final deve ser depois do inicial')
-      return
-    }
-    setError('')
-    if (isEdit) {
-      onUpdate({ ...form })
-    } else {
-      onSave({ ...form, date: format(date, 'yyyy-MM-dd') })
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-      style={{ background: 'rgba(15,15,15,0.4)' }} onClick={onClose}>
-      <form
-        onSubmit={handleSubmit}
-        onClick={e => e.stopPropagation()}
-        className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-sm max-h-[92dvh] overflow-y-auto"
-        style={{ boxShadow: '0 8px 40px rgba(15,15,15,0.12), 0 0 0 1px rgba(15,15,15,0.06)' }}
-      >
-        <div className="px-5 pt-4 pb-3 border-b border-notion-border flex items-center justify-between">
-          <h2 className="text-base font-semibold text-notion-text">
-            {isEdit ? 'Editar bloco' : 'Novo bloco'}
-          </h2>
-          <button type="button" onClick={onClose} className="text-notion-muted hover:text-notion-text"><X size={16} /></button>
-        </div>
-
-        <div className="px-5 py-4 flex flex-col gap-3">
-          <div>
-            <label className="label">Vincular tarefa</label>
-            <select className="input" value={form.task_id} onChange={handleTaskChange}>
-              <option value="">— bloco livre —</option>
-              {tasks.filter(t => !DONE_STATUSES.includes(t.status)).map(t => (
-                <option key={t.id} value={t.id}>{t.title}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Título *</label>
-            <input className="input" value={form.title} required
-              onChange={e => set('title', e.target.value)} placeholder="Ex: Reunião de equipe" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Início</label>
-              <input type="time" className="input" value={form.start_time}
-                onChange={e => set('start_time', e.target.value)} />
-            </div>
-            <div>
-              <label className="label">Fim</label>
-              <input type="time" className="input" value={form.end_time}
-                onChange={e => set('end_time', e.target.value)} />
-            </div>
-          </div>
-
-          {error && (
-            <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-md">
-              <AlertCircle size={12} /> {error}
-            </div>
-          )}
-
-          {/* Participants */}
-          {people.length > 0 && (
-            <div>
-              <label className="label flex items-center gap-1"><Users size={12} /> Participantes</label>
-              <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto border border-notion-border rounded-md px-3 py-2">
-                {people.map(p => {
-                  const checked = (form.participants || []).includes(p.id)
-                  return (
-                    <label key={p.id} className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleParticipant(p.id)}
-                        className="rounded border-notion-border2 accent-notion-text"
-                      />
-                      <span className="text-sm text-notion-text">{p.name}</span>
-                      {p.role && <span className="text-xs text-notion-muted ml-auto">{p.role}</span>}
-                    </label>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label className="label">Cor</label>
-            <div className="flex items-center gap-2">
-              <input type="color" className="w-8 h-8 rounded cursor-pointer border border-notion-border"
-                value={form.color} onChange={e => set('color', e.target.value)} />
-              <span className="text-xs text-notion-muted">{form.color}</span>
-            </div>
-          </div>
-
-          <div>
-            <label className="label flex items-center gap-1"><Repeat size={12} /> Recorrência</label>
-            <select className="input" value={form.recurrence} onChange={e => set('recurrence', e.target.value)}>
-              {Object.entries(RECURRENCE_LABELS).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
-
-          {form.recurrence !== 'none' && (
-            <div>
-              <label className="label">Repetir até (opcional)</label>
-              <input type="date" className="input" value={form.recurrence_end}
-                onChange={e => set('recurrence_end', e.target.value)} />
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={() => set('locked', !form.locked)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md border text-sm transition-all ${
-              form.locked
-                ? 'border-notion-text bg-notion-surface text-notion-text'
-                : 'border-notion-border text-notion-muted hover:border-notion-border2'
-            }`}
-          >
-            <Lock size={13} />
-            {form.locked ? 'Horário travado' : 'Travar horário'}
-            <span className="text-xs text-notion-muted ml-auto">
-              {form.locked ? 'Não pode ser deletado acidentalmente' : ''}
-            </span>
-          </button>
-        </div>
-
-        <div className="px-5 py-3 border-t border-notion-border bg-notion-surface flex gap-2 justify-end">
-          <button type="button" onClick={onClose} className="btn-ghost">Cancelar</button>
-          <button type="submit" className="btn-primary">
-            {isEdit ? 'Salvar' : 'Adicionar'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
-const PROVIDER_ICONS = { google: '🔵', clickup: '🟣', jira: '🔷', ical: '📅' }
-
-function ExternalEventChip({ event }) {
-  const [sh, sm] = (event.start_time || '00:00').split(':').map(Number)
-  const [eh, em] = (event.end_time || `${sh + 1}:00`).split(':').map(Number)
-  const top = (sh + sm / 60) * 56
-  const height = Math.max(((eh + em / 60) - (sh + sm / 60)) * 56, 24)
-  return (
-    <a
-      href={event.url || undefined}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="absolute left-16 right-3 rounded-md px-2.5 py-1 text-xs overflow-hidden"
-      style={{ top, height, border: '1.5px dashed #9b9a97', background: 'rgba(155,154,151,0.07)', color: '#6b7280' }}
-      title={`${PROVIDER_ICONS[event.provider] || '📅'} ${event.title}${event.url ? ' — abrir' : ''}`}
-    >
-      <div className="flex items-center gap-1">
-        <span className="text-[10px]">{PROVIDER_ICONS[event.provider] || '📅'}</span>
-        <p className="font-medium truncate leading-tight flex-1">{event.title}</p>
-        {event.url && <ExternalLinkIcon size={9} className="flex-shrink-0 opacity-60" />}
-      </div>
-      {!event.all_day && (
-        <p className="opacity-60 text-[11px]">{event.start_time} – {event.end_time}</p>
-      )}
-    </a>
-  )
-}
-
-function TimeGrid({ blocks, externalEvents, people, onDeleteBlock, onEditBlock }) {
-  return (
-    <div className="relative overflow-y-auto flex-1">
-      {HOURS.map(h => (
-        <div key={h} className="flex" style={{ height: 56 }}>
-          <span className="w-14 flex-shrink-0 text-xs text-notion-muted text-right pr-3 pt-1 select-none">
-            {pad(h)}:00
-          </span>
-          <div className="flex-1 border-t border-notion-border relative" />
-        </div>
-      ))}
-      {externalEvents.filter(e => !e.all_day && e.start_time).map(event => (
-        <ExternalEventChip key={event.id} event={event} />
-      ))}
-      {blocks.map(block => {
-        const [sh, sm] = block.start_time.split(':').map(Number)
-        const [eh, em] = block.end_time.split(':').map(Number)
-        const top = (sh + sm / 60) * 56
-        const height = Math.max(((eh + em / 60) - (sh + sm / 60)) * 56, 24)
-        const participants = Array.isArray(block.participants) ? block.participants : []
-        return (
-          <div
-            key={block.id + block.date}
-            className="absolute left-16 right-3 rounded-md px-2.5 py-1 text-white text-xs overflow-hidden group cursor-pointer"
-            style={{ top, height, backgroundColor: block.color || '#60a5fa', opacity: block.locked ? 1 : 0.9 }}
-            onClick={() => onEditBlock(block)}
-          >
-            <div className="flex items-center gap-1">
-              {block.locked && <Lock size={9} className="flex-shrink-0 opacity-80" />}
-              {isRecurring(block) && <Repeat size={9} className="flex-shrink-0 opacity-80" />}
-              <p className="font-medium truncate leading-tight flex-1">{block.title}</p>
-              {participants.length > 0 && (
-                <ParticipantBubbles ids={participants} people={people} max={3} />
-              )}
-            </div>
-            <p className="opacity-70 text-[11px]">{block.start_time} – {block.end_time}</p>
-            {participants.length > 0 && height >= 48 && (
-              <p className="opacity-70 text-[10px] truncate">
-                {participants.map(id => people.find(p => p.id === id)?.name?.split(' ')[0]).filter(Boolean).join(', ')}
-              </p>
-            )}
-            <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button
-                onClick={e => { e.stopPropagation(); onEditBlock(block) }}
-                className="hover:opacity-80"
-              >
-                <Pencil size={10} />
-              </button>
-              {!block.locked && (
-                <button
-                  onClick={e => { e.stopPropagation(); onDeleteBlock(block) }}
-                  className="hover:opacity-80"
-                >
-                  <X size={10} />
-                </button>
-              )}
-            </div>
-            {block.locked && (
-              <span className="absolute bottom-0.5 right-1.5 opacity-40 text-[10px]">travado</span>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
 export default function Agenda({ tasks, people = [], externalEvents = [], blocksApi, onCreateGoogleEvent, onEditTask }) {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }))
-  const [modal, setModal] = useState(null)          // null | 'new' | occurrence (edição)
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('eisenhower-agenda-view') || 'day')
+  const [showPanel, setShowPanel] = useState(() => localStorage.getItem('eisenhower-agenda-panel') === '1')
+  const [placingTask, setPlacingTask] = useState(null)
+  const [modal, setModal] = useState(null)          // null | {type:'new', prefill?} | {type:'edit', block}
   const [scopeAsk, setScopeAsk] = useState(null)    // null | { mode: 'edit'|'delete', block, patch? }
+
+  useEffect(() => { localStorage.setItem('eisenhower-agenda-view', viewMode) }, [viewMode])
+  useEffect(() => { localStorage.setItem('eisenhower-agenda-panel', showPanel ? '1' : '0') }, [showPanel])
 
   const { occurrencesFor, createBlock, updateBlock, deleteBlock } = blocksApi
 
   const selectedDateStr = format(selectedDate, 'yyyy-MM-dd')
-  const dayBlocks = occurrencesFor(selectedDateStr, selectedDateStr)
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const weekStartStr = format(weekDays[0], 'yyyy-MM-dd')
+  const weekEndStr = format(weekDays[6], 'yyyy-MM-dd')
 
+  const isWeek = viewMode === 'week'
+  const rangeStart = isWeek ? weekStartStr : selectedDateStr
+  const rangeEnd = isWeek ? weekEndStr : selectedDateStr
+
+  const occurrences = occurrencesFor(rangeStart, rangeEnd)
+
+  const days = (isWeek ? weekDays : [selectedDate]).map(d => {
+    const ds = format(d, 'yyyy-MM-dd')
+    return {
+      date: d,
+      dateStr: ds,
+      blocks: occurrences.filter(b => b.date === ds),
+      externalEvents: externalEvents.filter(e => e.date === ds),
+    }
+  })
+
+  // ── Ações ────────────────────────────────────────────────
   async function handleSaveNew(form) {
     await createBlock(form)
     setModal(null)
   }
 
-  // Edição vinda do modal: se a série é recorrente, pergunta o escopo
   function handleUpdateRequest(form) {
-    const occurrence = modal
+    const occurrence = modal.block
     if (isRecurring(occurrence)) {
       setModal(null)
       setScopeAsk({ mode: 'edit', block: occurrence, patch: form })
@@ -385,6 +100,23 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
     }
   }
 
+  function handleMoveBlock(occurrence, newDateStr, startMin) {
+    const dur = Math.max(15, hhmmToMinutes(occurrence.end_time) - hhmmToMinutes(occurrence.start_time))
+    const patch = {
+      date: newDateStr,
+      start_time: minutesToHHMM(startMin),
+      end_time: minutesToHHMM(Math.min(24 * 60, startMin + dur)),
+    }
+    if (isRecurring(occurrence)) setScopeAsk({ mode: 'edit', block: occurrence, patch })
+    else updateBlock(occurrence, patch)
+  }
+
+  function handleResizeBlock(occurrence, endMin) {
+    const patch = { end_time: minutesToHHMM(endMin) }
+    if (isRecurring(occurrence)) setScopeAsk({ mode: 'edit', block: occurrence, patch })
+    else updateBlock(occurrence, patch)
+  }
+
   async function resolveScope(scope) {
     const { mode, block, patch } = scopeAsk
     setScopeAsk(null)
@@ -394,30 +126,51 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
       } else {
         const seriesPatch = { ...patch }
         delete seriesPatch.id
-        delete seriesPatch.date // preserva a data de origem da série
+        if (seriesPatch.date && seriesPatch.date !== block.date) {
+          // mover a série inteira: desloca a origem pelo mesmo nº de dias
+          const delta = differenceInCalendarDays(parseISO(seriesPatch.date), parseISO(block.date))
+          const origin = parseISO(block.seriesDate || block.date)
+          seriesPatch.date = format(addDays(origin, delta), 'yyyy-MM-dd')
+        } else {
+          delete seriesPatch.date // preserva a data de origem da série
+        }
         await updateBlock(block, seriesPatch)
       }
     } else {
-      if (scope === 'single') {
-        await deleteBlock(block, { scope: 'single', date: block.date })
-      } else {
-        await deleteBlock(block)
-      }
+      if (scope === 'single') await deleteBlock(block, { scope: 'single', date: block.date })
+      else await deleteBlock(block)
     }
   }
 
+  function scheduleTask(taskId, dateStr, startMin) {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task) return
+    createBlock({
+      task_id: task.id,
+      title: task.title,
+      color: Q_COLORS[task.quadrant] || '#60a5fa',
+      date: dateStr,
+      start_time: minutesToHHMM(startMin),
+      end_time: minutesToHHMM(Math.min(24 * 60, startMin + 60)),
+    })
+  }
+
+  function handlePlaceTask(dateStr, startMin) {
+    if (!placingTask) return
+    scheduleTask(placingTask.id, dateStr, startMin)
+    setPlacingTask(null)
+  }
+
+  // ── Dados derivados (visão dia) ──────────────────────────
   const dayExternalEvents = externalEvents.filter(e => e.date === selectedDateStr)
   const allDayEvents = dayExternalEvents.filter(e => e.all_day || !e.start_time)
-  const timedExternalEvents = dayExternalEvents.filter(e => !e.all_day && e.start_time)
-
   const dueTasks = tasks.filter(t => t.due_date === selectedDateStr && !DONE_STATUSES.includes(t.status))
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const dayBlockCount = days.reduce((n, d) => n + d.blocks.length, 0)
 
   return (
     <div className="h-full flex flex-col">
-      {/* Week strip */}
-      <div className="flex items-center gap-1 px-6 py-3 border-b border-notion-border flex-shrink-0">
+      {/* Week strip / navegação */}
+      <div className="flex items-center gap-1 px-4 md:px-6 py-3 border-b border-notion-border flex-shrink-0">
         <button onClick={() => setWeekStart(w => addDays(w, -7))} className="btn-ghost p-1.5">
           <ChevronLeft size={14} />
         </button>
@@ -425,12 +178,13 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
           {weekDays.map(day => {
             const ds = format(day, 'yyyy-MM-dd')
             const hasTasks = tasks.some(t => t.due_date === ds && !DONE_STATUSES.includes(t.status))
+            const active = !isWeek && isSameDay(day, selectedDate)
             return (
               <button
                 key={day.toString()}
-                onClick={() => setSelectedDate(day)}
+                onClick={() => { setSelectedDate(day); if (isWeek) setViewMode('day') }}
                 className={`flex-1 rounded-md py-1.5 text-center transition-colors relative ${
-                  isSameDay(day, selectedDate)
+                  active
                     ? 'bg-notion-text text-white'
                     : isToday(day)
                     ? 'bg-notion-hover text-notion-text font-semibold'
@@ -442,7 +196,7 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
                 </div>
                 <div className="text-sm font-semibold">{format(day, 'd')}</div>
                 {hasTasks && (
-                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${isSameDay(day, selectedDate) ? 'bg-white/60' : 'bg-blue-400'}`} />
+                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${active ? 'bg-white/60' : 'bg-blue-400'}`} />
                 )}
               </button>
             )
@@ -453,37 +207,61 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
         </button>
       </div>
 
-      {/* Day header */}
-      <div className="flex items-center justify-between px-6 py-2 border-b border-notion-border flex-shrink-0">
-        <div>
-          <h2 className="text-sm font-semibold text-notion-text capitalize">
-            {format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
+      {/* Header do dia/semana */}
+      <div className="flex items-center justify-between px-4 md:px-6 py-2 border-b border-notion-border flex-shrink-0 gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-notion-text capitalize truncate">
+            {isWeek
+              ? `${format(weekDays[0], 'd MMM', { locale: ptBR })} – ${format(weekDays[6], "d 'de' MMMM", { locale: ptBR })}`
+              : format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })}
           </h2>
           <p className="text-xs text-notion-muted">
-            {dayBlocks.length} bloco{dayBlocks.length !== 1 ? 's' : ''}
-            {dueTasks.length > 0 && ` · ${dueTasks.length} tarefa${dueTasks.length !== 1 ? 's' : ''}`}
-            {dayExternalEvents.length > 0 && ` · ${dayExternalEvents.length} externo${dayExternalEvents.length !== 1 ? 's' : ''}`}
+            {dayBlockCount} bloco{dayBlockCount !== 1 ? 's' : ''}
+            {!isWeek && dueTasks.length > 0 && ` · ${dueTasks.length} tarefa${dueTasks.length !== 1 ? 's' : ''}`}
+            {!isWeek && dayExternalEvents.length > 0 && ` · ${dayExternalEvents.length} externo${dayExternalEvents.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {/* Toggle Dia | Semana */}
+          <div className="flex rounded-md border border-notion-border overflow-hidden text-xs">
+            <button
+              onClick={() => setViewMode('day')}
+              className={`px-2.5 py-1.5 font-medium transition-colors ${!isWeek ? 'bg-notion-text text-white' : 'text-notion-muted hover:bg-notion-surface'}`}
+            >
+              Dia
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-2.5 py-1.5 font-medium transition-colors ${isWeek ? 'bg-notion-text text-white' : 'text-notion-muted hover:bg-notion-surface'}`}
+            >
+              Semana
+            </button>
+          </div>
+          <button
+            onClick={() => setShowPanel(v => !v)}
+            title="Painel de tarefas"
+            className={`btn-ghost p-1.5 ${showPanel ? 'bg-notion-hover text-notion-text' : ''}`}
+          >
+            <ListTodo size={14} />
+          </button>
           {onCreateGoogleEvent && (
             <button
               onClick={() => onCreateGoogleEvent({ date: selectedDateStr, title: '' })}
-              className="btn-ghost py-1.5 px-3 text-xs"
+              className="btn-ghost py-1.5 px-2.5 text-xs hidden sm:flex"
               title="Criar evento no Google Calendar"
             >
               🔵 Google
             </button>
           )}
-          <button onClick={() => setModal('new')} className="btn-ghost py-2 px-4">
-            <Plus size={13} /> Bloco
+          <button onClick={() => setModal({ type: 'new' })} className="btn-ghost py-1.5 px-3">
+            <Plus size={13} /> <span className="hidden sm:inline">Bloco</span>
           </button>
         </div>
       </div>
 
-      {/* Tasks due today */}
-      {dueTasks.length > 0 && (
-        <div className="px-6 py-2 border-b border-notion-border flex-shrink-0 flex flex-col gap-1.5">
+      {/* Tarefas do dia (visão dia) — arrastáveis para a grade */}
+      {!isWeek && dueTasks.length > 0 && (
+        <div className="px-4 md:px-6 py-2 border-b border-notion-border flex-shrink-0 flex flex-col gap-1.5">
           <p className="text-[10px] uppercase tracking-wide text-notion-muted font-medium">Tarefas do dia</p>
           <div className="flex flex-wrap gap-1.5">
             {dueTasks.map(task => {
@@ -492,8 +270,13 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
               return (
                 <button
                   key={task.id}
+                  draggable
+                  onDragStart={e => {
+                    e.dataTransfer.setData('application/x-task-id', task.id)
+                    e.dataTransfer.effectAllowed = 'copy'
+                  }}
                   onClick={() => onEditTask?.(task)}
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-notion-border hover:border-notion-border2 hover:bg-notion-surface transition-colors text-notion-text"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border border-notion-border hover:border-notion-border2 hover:bg-notion-surface transition-colors text-notion-text cursor-grab active:cursor-grabbing"
                   style={{ borderLeft: `3px solid ${Q_COLORS[task.quadrant] || '#9b9a97'}` }}
                 >
                   <span className="truncate max-w-[160px]">{task.title}</span>
@@ -514,9 +297,9 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
         </div>
       )}
 
-      {/* All-day external events banner */}
-      {allDayEvents.length > 0 && (
-        <div className="px-6 py-1.5 border-b border-notion-border flex-shrink-0 flex flex-wrap gap-1.5">
+      {/* Eventos externos de dia inteiro (visão dia) */}
+      {!isWeek && allDayEvents.length > 0 && (
+        <div className="px-4 md:px-6 py-1.5 border-b border-notion-border flex-shrink-0 flex flex-wrap gap-1.5">
           {allDayEvents.map(ev => (
             <a
               key={ev.id}
@@ -534,23 +317,95 @@ export default function Agenda({ tasks, people = [], externalEvents = [], blocks
         </div>
       )}
 
-      {/* Grid */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <TimeGrid
-          blocks={dayBlocks}
-          externalEvents={timedExternalEvents}
-          people={people}
-          onDeleteBlock={handleDeleteRequest}
-          onEditBlock={block => setModal(block)}
-        />
+      {/* Corpo: grade (+ painel lateral no desktop) */}
+      <div className="flex-1 min-h-0 overflow-hidden flex">
+        <div className={`flex-1 min-w-0 overflow-x-auto flex flex-col ${isWeek ? '' : ''}`}>
+          <div className={`h-full flex flex-col ${isWeek ? 'min-w-[640px]' : ''}`}>
+            {/* Cabeçalho das colunas (semana) */}
+            {isWeek && (
+              <div className="flex border-b border-notion-border flex-shrink-0">
+                <div className="w-14 flex-shrink-0" />
+                {days.map(day => {
+                  const dayAllDay = (day.externalEvents || []).filter(e => e.all_day || !e.start_time)
+                  return (
+                    <button
+                      key={day.dateStr}
+                      onClick={() => { setSelectedDate(day.date); setViewMode('day') }}
+                      className={`flex-1 border-l border-notion-border px-1 py-1.5 text-center hover:bg-notion-surface transition-colors ${
+                        isToday(day.date) ? 'bg-notion-hover' : ''
+                      }`}
+                    >
+                      <span className={`text-[11px] uppercase tracking-wide ${isToday(day.date) ? 'text-notion-text font-semibold' : 'text-notion-muted'}`}>
+                        {format(day.date, 'EEE d', { locale: ptBR })}
+                      </span>
+                      {dayAllDay.length > 0 && (
+                        <span className="block text-[9px] text-notion-muted truncate">
+                          {dayAllDay.length} dia inteiro
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+            <TimeGrid
+              days={days}
+              people={people}
+              onEditBlock={block => setModal({ type: 'edit', block })}
+              onDeleteBlock={handleDeleteRequest}
+              onCreateAt={({ dateStr, start_time, end_time }) => setModal({ type: 'new', prefill: { date: dateStr, start_time, end_time } })}
+              onMoveBlock={handleMoveBlock}
+              onResizeBlock={handleResizeBlock}
+              onDropTask={scheduleTask}
+              placingTask={placingTask}
+              onPlaceTask={handlePlaceTask}
+            />
+          </div>
+        </div>
+
+        {/* Painel lateral de tarefas (desktop) */}
+        {showPanel && (
+          <div className="hidden md:flex">
+            <TaskPanel
+              tasks={tasks}
+              placingTask={placingTask}
+              onStartPlacing={setPlacingTask}
+              onCancelPlacing={() => setPlacingTask(null)}
+              onClose={() => setShowPanel(false)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Painel de tarefas mobile — bottom sheet */}
+      {showPanel && (
+        <div className="md:hidden">
+          <TaskPanel
+            variant="sheet"
+            tasks={tasks}
+            placingTask={placingTask}
+            onStartPlacing={t => { setPlacingTask(t); setShowPanel(false) }}
+            onCancelPlacing={() => setPlacingTask(null)}
+            onClose={() => setShowPanel(false)}
+          />
+        </div>
+      )}
+
+      {/* Banner de posicionamento (mobile, painel fechado) */}
+      {placingTask && !showPanel && (
+        <div className="md:hidden fixed bottom-16 inset-x-3 z-40 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 flex items-center gap-2 shadow-lg">
+          <span className="flex-1">Toque na grade para agendar "{placingTask.title}"</span>
+          <button onClick={() => setPlacingTask(null)} className="text-amber-500 font-medium">Cancelar</button>
+        </div>
+      )}
 
       {modal && (
         <BlockModal
-          date={selectedDate}
+          defaultDate={selectedDateStr}
+          prefill={modal.prefill}
           tasks={tasks}
           people={people}
-          initialBlock={modal === 'new' ? null : modal}
+          initialBlock={modal.type === 'edit' ? modal.block : null}
           onSave={handleSaveNew}
           onUpdate={handleUpdateRequest}
           onClose={() => setModal(null)}

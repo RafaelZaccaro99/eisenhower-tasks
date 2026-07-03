@@ -87,7 +87,8 @@ export function useBlocks() {
       try {
         const detached = {
           ...block, ...patch,
-          id: uuidv4(), date,
+          id: uuidv4(),
+          date: patch.date || date, // ocorrência movida pode trocar de dia
           recurrence: 'none', recurrence_end: '', recurrence_exceptions: [],
         }
         delete detached.created_at; delete detached.seriesDate; delete detached.user_id
@@ -100,6 +101,7 @@ export function useBlocks() {
     } else {
       const clean = { ...patch }
       delete clean.seriesDate
+      delete clean.id
       await persistPatch(block.id, clean)
     }
     await reload()

@@ -18,6 +18,9 @@ export const STATUS_TRANSITIONS = {
 
 export const DONE_STATUSES = ['completed', 'cancelled']
 
+// Cores hex por quadrante (agenda, chips, painéis)
+export const Q_COLORS = { q1: '#f87171', q2: '#60a5fa', q3: '#fbbf24', q4: '#9b9a97' }
+
 export function calcQuadrant(urgent, important) {
   if (urgent && important) return 'q1'
   if (!urgent && important) return 'q2'
