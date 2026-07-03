@@ -14,6 +14,7 @@ const RECURRENCE_LABELS = {
 export default function BlockModal({ defaultDate, prefill, tasks, people, clients = [], initialBlock, onSave, onUpdate, onClose }) {
   const isEdit = !!initialBlock?.id
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
   const [form, setForm] = useState(() => {
     const base = {
       task_id: '', title: '', start_time: '09:00', end_time: '10:00',
@@ -57,16 +58,22 @@ export default function BlockModal({ defaultDate, prefill, tasks, people, client
     }))
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (form.start_time >= form.end_time) {
       setError('O horário final deve ser depois do inicial')
       return
     }
     setError('')
+    setSaving(true)
     const payload = { ...form, client_id: form.client_id || null }
-    if (isEdit) onUpdate(payload)
-    else onSave(payload)
+    try {
+      if (isEdit) await onUpdate(payload)
+      else await onSave(payload)
+    } catch (err) {
+      setError(err.message || 'Erro ao salvar o bloco')
+      setSaving(false)
+    }
   }
 
   return (
@@ -207,8 +214,8 @@ export default function BlockModal({ defaultDate, prefill, tasks, people, client
 
         <div className="px-5 py-3 border-t border-notion-border bg-notion-surface flex gap-2 justify-end">
           <button type="button" onClick={onClose} className="btn-ghost">Cancelar</button>
-          <button type="submit" className="btn-primary">
-            {isEdit ? 'Salvar' : 'Adicionar'}
+          <button type="submit" className="btn-primary" disabled={saving}>
+            {saving ? 'Salvando…' : (isEdit ? 'Salvar' : 'Adicionar')}
           </button>
         </div>
       </form>

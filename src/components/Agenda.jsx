@@ -84,13 +84,14 @@ export default function Agenda({ tasks, people = [], clients = [], externalEvent
     setModal(null)
   }
 
-  function handleUpdateRequest(form) {
+  async function handleUpdateRequest(form) {
     const occurrence = modal.block
     if (isRecurring(occurrence)) {
       setModal(null)
       setScopeAsk({ mode: 'edit', block: occurrence, patch: form })
     } else {
-      updateBlock(occurrence, form).then(() => setModal(null))
+      await updateBlock(occurrence, form)
+      setModal(null)
     }
   }
 
