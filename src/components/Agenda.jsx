@@ -267,7 +267,7 @@ export default function Agenda({ tasks, people = [], clients = [], externalEvent
             </button>
           )}
           <button onClick={() => setModal({ type: 'new' })} className="btn-ghost py-1.5 px-3">
-            <Plus size={13} /> <span className="hidden sm:inline">Bloco</span>
+            <Plus size={13} /> <span className="hidden sm:inline">Nova agenda</span>
           </button>
         </div>
       </div>
