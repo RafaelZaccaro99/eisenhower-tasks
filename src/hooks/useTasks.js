@@ -126,7 +126,8 @@ export function useTasks() {
 
     // Record status transition if status changed
     const existing = tasksRef.current.find(t => t.id === data.id)
-    if (existing && data.status && existing.status !== data.status) {
+    const statusChanged = existing && data.status && existing.status !== data.status
+    if (statusChanged) {
       const entry = {
         id: uuidv4(),
         task_id: data.id,
@@ -152,8 +153,29 @@ export function useTasks() {
       if (idx !== -1) all[idx] = patch
       lsWrite(all)
     }
+
+    if (statusChanged && data.status === 'completed') {
+      await maybeSpawnNextRecurrence(patch)
+    }
     await load()
   }, [load])
+
+  // Gera a próxima instância de uma tarefa recorrente ao concluí-la.
+  // Base do cálculo: due_date da tarefa, ou hoje quando não há prazo.
+  const maybeSpawnNextRecurrence = useCallback(async (task) => {
+    if (!task.recurrence || task.recurrence === 'none') return
+    const today = new Date().toISOString().split('T')[0]
+    const nextDate = nextDueDate(task.due_date || today, task.recurrence)
+    const withinEnd = !task.recurrence_end || nextDate <= task.recurrence_end
+    if (!withinEnd) return
+    await createTask({
+      ...task,
+      id: undefined,
+      status: 'pending',
+      due_date: nextDate,
+      created_at: undefined,
+    })
+  }, [createTask])
 
   const deleteTask = useCallback(async (id) => {
     if (ipc) {
@@ -169,21 +191,7 @@ export function useTasks() {
   const toggleStatus = useCallback(async (task) => {
     const next = task.status === 'completed' ? 'pending' : 'completed'
     await updateTask({ ...task, status: next })
-
-    if (next === 'completed' && task.recurrence && task.recurrence !== 'none' && task.due_date) {
-      const nextDate = nextDueDate(task.due_date, task.recurrence)
-      const withinEnd = !task.recurrence_end || nextDate <= task.recurrence_end
-      if (withinEnd) {
-        await createTask({
-          ...task,
-          id: undefined,
-          status: 'pending',
-          due_date: nextDate,
-          created_at: undefined,
-        })
-      }
-    }
-  }, [updateTask, createTask])
+  }, [updateTask])
 
   return { tasks, loading, serverMode, statusHistory, createTask, updateTask, deleteTask, toggleStatus }
 }

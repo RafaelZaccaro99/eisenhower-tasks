@@ -48,8 +48,8 @@ export default function TaskModal({ task, people = [], assistantEnabled = false,
   const isEdit = !!task?.id
   const [form, setForm] = useState({
     title: '', description: '', urgent: false, important: false,
-    due_date: '', category: 'geral', status: 'pending', delegated_to: '',
-    recurrence: 'none', recurrence_end: '',
+    due_date: '', category: 'geral', delegated_to: '',
+    recurrence_end: '',
     ...task,
     recurrence: task?.recurrence || 'none',
     status: task?.status || 'pending',

@@ -16,10 +16,11 @@ module.exports = async (req, res) => {
         date: d.date,
         start_time: d.start_time,
         end_time: d.end_time,
-        color: d.color || 'blue',
+        color: d.color || '#60a5fa',
         locked: !!d.locked,
         recurrence: d.recurrence || null,
         recurrence_end: d.recurrence_end || null,
+        participants: Array.isArray(d.participants) ? d.participants : [],
       }
       const updated = await sb(`/blocks?id=eq.${id}`, 'PATCH', patch, token)
       return res.status(200).json(Array.isArray(updated) ? updated[0] : updated)

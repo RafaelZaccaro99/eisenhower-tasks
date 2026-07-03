@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Send, ChevronDown, CheckSquare, AtSign, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 import { sendSlackMessage, buildBlocks } from '../utils/slack'
+import { DONE_STATUSES } from '../utils/statusConfig'
 
 const Q_LABEL = { q1: '🔴 Fazer agora', q2: '🔵 Agendar', q3: '🟡 Delegar', q4: '⚪ Eliminar' }
 
@@ -21,7 +22,7 @@ export default function SlackComposer({ person, tasks = [], people = [], slackBo
   const [status, setStatus] = useState('idle') // idle | sending | success | error
   const [errorMsg, setErrorMsg] = useState('')
 
-  const pendingTasks = tasks.filter(t => t.status !== 'completed')
+  const pendingTasks = tasks.filter(t => !DONE_STATUSES.includes(t.status))
   const mentionablePeople = people.filter(p => p.id !== person.id && p.slackId)
 
   const initials = person.name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
