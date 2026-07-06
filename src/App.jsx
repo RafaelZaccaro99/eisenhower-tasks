@@ -10,6 +10,7 @@ import TaskModal from './components/TaskModal'
 import ChatPanel from './components/ChatPanel'
 import Onboarding from './components/Onboarding'
 import AuthScreen from './components/AuthScreen'
+import ConnectClaude from './components/ConnectClaude'
 import { useTasks } from './hooks/useTasks'
 import { usePeople } from './hooks/usePeople'
 import { useBlocks } from './hooks/useBlocks'
@@ -32,6 +33,13 @@ const VIEWS = [
 ]
 
 export default function App() {
+  if (window.location.pathname === '/connect-claude') {
+    const requestId = new URLSearchParams(window.location.search).get('request_id')
+    return requestId
+      ? <ConnectClaude requestId={requestId} />
+      : <div className="p-8 text-sm text-red-500">Link de autorização inválido — faltou request_id.</div>
+  }
+
   const auth = useAuth()
   const { user, accessToken, loading: authLoading, signIn, signUp, refreshSession } = auth
   useEffect(() => { setProxyToken(accessToken || '') }, [accessToken])
