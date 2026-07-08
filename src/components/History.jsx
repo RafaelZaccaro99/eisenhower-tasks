@@ -3,50 +3,13 @@ import { Check, Trash2, RotateCcw, ChevronDown, ChevronRight, Download, Timer, T
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, isWithinInterval } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { STATUS_CONFIG, DONE_STATUSES } from '../utils/statusConfig'
+import { computeSLA } from '../utils/sla'
 
 const Q_INFO = {
   q1: { label: 'Fez agora',  color: 'text-red-500',         bg: 'bg-red-50',          dot: 'bg-red-400'         },
   q2: { label: 'Agendou',    color: 'text-blue-500',        bg: 'bg-blue-50',         dot: 'bg-blue-400'        },
   q3: { label: 'Delegou',    color: 'text-amber-500',       bg: 'bg-amber-50',        dot: 'bg-amber-400'       },
   q4: { label: 'Eliminou',   color: 'text-notion-muted',    bg: 'bg-notion-surface',  dot: 'bg-notion-border2'  },
-}
-
-function daysBetween(a, b) {
-  return Math.round((new Date(b) - new Date(a)) / 86400000)
-}
-
-function computeSLA(task, allHistory) {
-  const h = allHistory
-    .filter(e => e.task_id === task.id)
-    .sort((a, b) => a.changed_at.localeCompare(b.changed_at))
-
-  const completedEntry = h.find(e => e.to_status === 'completed')
-  const startedEntry   = h.find(e => e.to_status === 'in_progress')
-
-  const completedAt = completedEntry?.changed_at
-  const startedAt   = startedEntry?.changed_at
-  const createdAt   = task.created_at
-  const dueDate     = task.due_date
-
-  const leadTime  = completedAt && createdAt   ? daysBetween(createdAt, completedAt)   : null
-  const cycleTime = completedAt && startedAt   ? daysBetween(startedAt, completedAt)   : null
-
-  let slaOk = null
-  let daysLate = null
-  if (completedAt && dueDate) {
-    slaOk = completedAt.split('T')[0] <= dueDate
-    if (!slaOk) daysLate = daysBetween(dueDate + 'T23:59:59', completedAt)
-  }
-
-  let blockedMs = 0
-  h.forEach((entry, idx) => {
-    if (entry.to_status === 'blocked' && h[idx + 1]) {
-      blockedMs += new Date(h[idx + 1].changed_at) - new Date(entry.changed_at)
-    }
-  })
-  const timeBlockedDays = blockedMs > 0 ? Math.round(blockedMs / 86400000) : 0
-
-  return { leadTime, cycleTime, slaOk, daysLate, timeBlockedDays, history: h }
 }
 
 function exportCSV(tasks, slaByTask) {

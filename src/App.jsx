@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { LayoutGrid, CalendarDays, Users, Settings as SettingsIcon, Plus, Clock, LogOut, MessageCircle, Briefcase } from 'lucide-react'
 import Matrix from './components/Matrix'
 import Agenda from './components/Agenda'
@@ -84,6 +84,15 @@ function MainApp({ auth, ws }) {
   const currentUserId = user?.id
   const activeMembers = ws.members.filter(m => m.status === 'active')
   const { clients, createClient, updateClient, deleteClient, archiveClient } = useClients(ws.workspace)
+
+  // Agenda de hoje + 7 dias para o contexto do assistente
+  const agendaOccurrences = useMemo(() => {
+    const pad = n => String(n).padStart(2, '0')
+    const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const today = new Date()
+    const plus7 = new Date(Date.now() + 7 * 86400000)
+    return blocksApi.occurrencesFor(fmt(today), fmt(plus7))
+  }, [blocksApi.occurrencesFor])
 
   // Handle OAuth callback redirect params
   useEffect(() => {
@@ -381,11 +390,18 @@ function MainApp({ auth, ws }) {
         <ChatPanel
           tasks={tasks}
           people={people}
+          clients={clients}
+          agendaOccurrences={agendaOccurrences}
+          statusHistory={statusHistory}
+          anamnesis={settings.anamnesis}
           aiConfig={aiConfig}
           onClose={() => setChatOpen(false)}
           onCreateTask={createTask}
           onCreatePerson={createPerson}
           onCreateBlock={createBlock}
+          onUpdateTask={updateTask}
+          onDeleteTask={deleteTask}
+          onCreateClient={serverMode ? createClient : null}
         />
       )}
     </div>

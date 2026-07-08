@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Check, Zap, ZapOff, ChevronDown, Loader2, RefreshCw, MessageSquare } from 'lucide-react'
+import { X, Check, Zap, ZapOff, ChevronDown, Loader2, RefreshCw, MessageSquare, Mic, MicOff } from 'lucide-react'
+import { useSpeech } from '../hooks/useSpeech'
 import { classifyTask, quadrantLabel } from '../utils/classifier'
 import { classifyTaskWithAI } from '../utils/aiClassifier'
 import { sendSlackMessage, buildBlocks } from '../utils/slack'
@@ -66,6 +67,10 @@ export default function TaskModal({ task, people = [], clients = [], members = [
   const debounceRef = useRef(null)
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const speech = useSpeech({
+    onFinal: text => setForm(f => ({ ...f, title: (f.title ? f.title.trimEnd() + ' ' : '') + text })),
+  })
 
   const q = calcQuadrant(form.urgent, form.important)
   const qInfo = Q_LABELS[q]
@@ -169,10 +174,22 @@ export default function TaskModal({ task, people = [], clients = [], members = [
             <input
               autoFocus
               className="flex-1 text-xl font-semibold text-notion-text placeholder-notion-placeholder bg-transparent outline-none"
-              placeholder="Título da tarefa"
+              placeholder={speech.listening ? 'Fale o título…' : 'Título da tarefa'}
               value={form.title}
               onChange={e => set('title', e.target.value)}
             />
+            {speech.supported && (
+              <button
+                type="button"
+                onClick={speech.toggle}
+                title={speech.listening ? 'Parar de ouvir' : 'Ditar título por voz'}
+                className={`flex-shrink-0 p-1.5 rounded-md transition-colors mt-1 ${
+                  speech.listening ? 'text-red-500 bg-red-50 animate-pulse' : 'text-notion-muted hover:bg-notion-surface'
+                }`}
+              >
+                {speech.listening ? <MicOff size={15} /> : <Mic size={15} />}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setUseAssistant(v => !v)}
