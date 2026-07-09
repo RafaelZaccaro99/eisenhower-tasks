@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { isServerUp, dataApi, setWorkspaceId } from '../utils/dataApi'
+import { isServerUp, dataApi, setWorkspaceId, getAuthToken } from '../utils/dataApi'
 
 const LS_KEY = 'eisenhower-workspace'
 
@@ -70,6 +70,13 @@ export function useWorkspace(user) {
     if (!workspace) return
     await dataApi.workspaces.invite(workspace.id, email, role)
     await reloadMembers()
+    // E-mail é conveniência, não fonte da verdade — o convite já existe mesmo
+    // se isso falhar (ex: RESEND_API_KEY ainda não configurada).
+    fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getAuthToken()}` },
+      body: JSON.stringify({ kind: 'workspace_invite', workspace_id: workspace.id, invited_email: email }),
+    }).catch(() => {})
   }, [workspace, reloadMembers])
 
   const updateMemberRole = useCallback(async (memberId, role) => {

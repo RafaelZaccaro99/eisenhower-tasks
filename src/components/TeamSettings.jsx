@@ -157,7 +157,7 @@ export default function TeamSettings({
               </div>
             ))}
             <p className="text-xs text-notion-muted">
-              Peça para a pessoa criar uma conta no app com o e-mail convidado — ela entra no workspace automaticamente no primeiro login.
+              Enviamos um e-mail com o convite (se o envio estiver configurado). De qualquer forma, a pessoa entra no workspace automaticamente ao criar conta ou logar com o e-mail convidado.
             </p>
           </div>
         )}
