@@ -19,15 +19,27 @@ function isExpired(token) {
   } catch { return true }
 }
 
-async function sbAuth(path, body) {
+async function sbAuth(path, body, { method = 'POST', token } = {}) {
+  const headers = { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
   const res = await fetch(`${SUPABASE_URL}/auth/v1${path}`, {
-    method: 'POST',
-    headers: { 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
   })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error_description || data.msg || 'Erro de autenticação')
   return data
+}
+
+// Sessão de recuperação de senha: Supabase redireciona pro app com
+// #access_token=...&refresh_token=...&type=recovery na URL.
+export function parseRecoveryHash(hash) {
+  if (!hash || !hash.includes('type=recovery')) return null
+  const params = new URLSearchParams(hash.replace(/^#/, ''))
+  const accessToken = params.get('access_token')
+  const refreshToken = params.get('refresh_token')
+  return accessToken ? { accessToken, refreshToken } : null
 }
 
 export function useAuth() {
@@ -92,5 +104,17 @@ export function useAuth() {
     return refresh(stored.refresh_token)
   }, [refresh])
 
-  return { user: session?.user || null, accessToken: session?.access_token || null, loading, signIn, signUp, signOut, refreshSession }
+  const requestPasswordReset = useCallback(async (email) => {
+    await sbAuth('/recover', { email, options: { redirect_to: window.location.origin + '/' } })
+  }, [])
+
+  const confirmPasswordReset = useCallback(async ({ accessToken, refreshToken }, newPassword) => {
+    await sbAuth('/user', { password: newPassword }, { method: 'PUT', token: accessToken })
+    applySession({ access_token: accessToken, refresh_token: refreshToken })
+  }, [applySession])
+
+  return {
+    user: session?.user || null, accessToken: session?.access_token || null, loading,
+    signIn, signUp, signOut, refreshSession, requestPasswordReset, confirmPasswordReset,
+  }
 }

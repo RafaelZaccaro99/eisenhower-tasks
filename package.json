@@ -8,6 +8,8 @@
     "data-server": "node data-server.mjs",
     "mcp": "node mcp-server.mjs",
     "build": "vite build",
+    "test": "vitest",
+    "test:run": "vitest run",
     "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron . --no-sandbox --disable-gpu\"",
     "electron:build": "vite build && electron-builder"
   },
@@ -37,6 +39,7 @@
     "vite": "^5.2.11",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5",
+    "vitest": "^2.1.9",
     "wait-on": "^7.2.0"
   },
   "build": {

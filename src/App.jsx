@@ -15,7 +15,7 @@ import { useTasks } from './hooks/useTasks'
 import { usePeople } from './hooks/usePeople'
 import { useBlocks } from './hooks/useBlocks'
 import { useSettings } from './hooks/useSettings'
-import { useAuth } from './hooks/useAuth'
+import { useAuth, parseRecoveryHash } from './hooks/useAuth'
 import { useWorkspace } from './hooks/useWorkspace'
 import { useClients } from './hooks/useClients'
 import { useNotifications } from './hooks/useNotifications'
@@ -41,9 +41,15 @@ export default function App() {
   }
 
   const auth = useAuth()
-  const { user, accessToken, loading: authLoading, signIn, signUp, refreshSession } = auth
+  const { user, accessToken, loading: authLoading, signIn, signUp, refreshSession, requestPasswordReset } = auth
   useEffect(() => { setProxyToken(accessToken || '') }, [accessToken])
   useEffect(() => { setUnauthorizedHandler(refreshSession) }, [refreshSession])
+
+  // Link de recuperação de senha do Supabase volta com #access_token=...&type=recovery.
+  const recovery = parseRecoveryHash(window.location.hash)
+  if (recovery) {
+    return <AuthScreen mode="reset" recoveryTokens={recovery} onConfirmReset={auth.confirmPasswordReset} />
+  }
 
   // Resolve o workspace ANTES de montar os hooks de dados — garante que
   // os lists/creates já saiam carimbados com o workspace correto.
@@ -58,7 +64,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} onRequestReset={requestPasswordReset} />
   }
 
   return <MainApp auth={auth} ws={ws} />
