@@ -30,8 +30,11 @@ export function computeSLA(task, allHistory) {
 
   let blockedMs = 0
   h.forEach((entry, idx) => {
-    if (entry.to_status === 'blocked' && h[idx + 1]) {
-      blockedMs += new Date(h[idx + 1].changed_at) - new Date(entry.changed_at)
+    if (entry.to_status === 'blocked') {
+      // Se ainda não saiu de 'blocked' (é a última entrada), conta até agora
+      // em vez de ignorar — é justamente o caso mais crítico (tarefa emperrada).
+      const until = h[idx + 1] ? new Date(h[idx + 1].changed_at) : new Date()
+      blockedMs += until - new Date(entry.changed_at)
     }
   })
   const timeBlockedDays = blockedMs > 0 ? Math.round(blockedMs / 86400000) : 0

@@ -119,7 +119,7 @@ async function authorize(req, res) {
 async function pending(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'method_not_allowed' })
   const { request_id } = req.query
-  const rows = await sbService(`/mcp_authorization_requests?id=eq.${request_id}&consumed=eq.false`)
+  const rows = await sbService(`/mcp_authorization_requests?id=eq.${encodeURIComponent(request_id)}&consumed=eq.false`)
   const row = rows[0]
   if (!row || new Date(row.expires_at) < new Date()) {
     return res.status(410).json({ error: 'expired_or_invalid_request' })
@@ -142,7 +142,7 @@ async function consent(req, res) {
 
   // Consome a pending request atomicamente — evita duplo-clique / replay.
   const consumedRows = await sbService(
-    `/mcp_authorization_requests?id=eq.${request_id}&consumed=eq.false`, 'PATCH', { consumed: true },
+    `/mcp_authorization_requests?id=eq.${encodeURIComponent(request_id)}&consumed=eq.false`, 'PATCH', { consumed: true },
   )
   const row = consumedRows[0]
   if (!row) return res.status(409).json({ error: 'already_used_or_not_found' })

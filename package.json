@@ -14,7 +14,6 @@
     "electron:build": "vite build && electron-builder"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.107.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.6",
     "date-fns": "^3.6.0",

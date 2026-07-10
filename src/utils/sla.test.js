@@ -43,6 +43,15 @@ describe('computeSLA', () => {
     expect(result.timeBlockedDays).toBe(2)
   })
 
+  it('conta tempo bloqueado até agora quando a tarefa nunca saiu do estado blocked', () => {
+    const history = [
+      { task_id: 't1', to_status: 'in_progress', changed_at: '2026-01-02T09:00:00Z' },
+      { task_id: 't1', to_status: 'blocked', changed_at: new Date(Date.now() - 3 * 86400000).toISOString() },
+    ]
+    const result = computeSLA(task, history)
+    expect(result.timeBlockedDays).toBeGreaterThanOrEqual(3)
+  })
+
   it('retorna leadTime/cycleTime/slaOk nulos quando a tarefa nunca foi concluída', () => {
     const result = computeSLA(task, [])
     expect(result.leadTime).toBeNull()

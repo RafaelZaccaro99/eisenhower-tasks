@@ -2,13 +2,39 @@
 // RESEND_API_KEY configurada, no-opa silenciosamente — o convite já
 // funciona sem e-mail (a pessoa entra no workspace no primeiro login com
 // o e-mail convidado), o e-mail é só uma conveniência.
-const { cors, requireAuth, sb } = require('./_lib')
+const { createHash } = require('crypto')
+const { cors, requireAuth, sb, sbService } = require('./_lib')
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173'
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const RESEND_FROM = process.env.RESEND_FROM || 'Eisenhower Tasks <onboarding@resend.dev>'
+const INVITE_EMAIL_RATE_LIMIT = 3 // reenvios por convite (workspace+e-mail) por hora
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Gestor', member: 'Membro' }
+const sha256hex = (s) => createHash('sha256').update(s).digest('hex')
+
+function currentHourWindow() {
+  const d = new Date()
+  d.setUTCMinutes(0, 0, 0)
+  return d.toISOString()
+}
+
+// Reaproveita a tabela dcr_rate_limits (criada pro rate limit do DCR) como
+// contador genérico de janela horária — evita que um admin de workspace
+// use este endpoint autenticado como mail-bomber contra um e-mail externo.
+async function checkInviteRateLimit(workspaceId, email) {
+  const keyHash = sha256hex(`invite:${workspaceId}:${email.toLowerCase()}`)
+  const windowStart = currentHourWindow()
+  const existing = await sbService(`/dcr_rate_limits?ip_hash=eq.${keyHash}&window_start=eq.${encodeURIComponent(windowStart)}`)
+  const row = existing[0]
+  if (row && row.count >= INVITE_EMAIL_RATE_LIMIT) return false
+  if (row) {
+    await sbService(`/dcr_rate_limits?ip_hash=eq.${keyHash}&window_start=eq.${encodeURIComponent(windowStart)}`, 'PATCH', { count: row.count + 1 })
+  } else {
+    await sbService('/dcr_rate_limits', 'POST', { ip_hash: keyHash, window_start: windowStart, count: 1 })
+  }
+  return true
+}
 
 async function sendViaResend({ to, subject, html }) {
   if (!RESEND_API_KEY) return { sent: false, reason: 'email_not_configured' }
@@ -41,12 +67,17 @@ async function workspaceInvite(req, res, token) {
   // RLS garante que só um membro ativo do workspace enxerga essa linha —
   // reaproveita a checagem de autorização em vez de reimplementá-la.
   const [member] = await sb(
-    `/workspace_members?workspace_id=eq.${workspace_id}&invited_email=eq.${encodeURIComponent(invited_email)}&status=eq.invited`,
+    `/workspace_members?workspace_id=eq.${encodeURIComponent(workspace_id)}&invited_email=eq.${encodeURIComponent(invited_email)}&status=eq.invited`,
     'GET', undefined, token,
   )
   if (!member) return res.status(404).json({ error: 'invite_not_found' })
 
-  const [workspace] = await sb(`/workspaces?id=eq.${workspace_id}`, 'GET', undefined, token)
+  const allowed = await checkInviteRateLimit(workspace_id, invited_email).catch(() => true) // fail-open: erro no rate limiter nunca bloqueia convite legítimo
+  if (!allowed) {
+    return res.status(429).json({ error: 'too_many_requests', error_description: 'Limite de reenvios deste convite excedido. Tente novamente mais tarde.' })
+  }
+
+  const [workspace] = await sb(`/workspaces?id=eq.${encodeURIComponent(workspace_id)}`, 'GET', undefined, token)
   if (!workspace) return res.status(404).json({ error: 'workspace_not_found' })
 
   const result = await sendViaResend({

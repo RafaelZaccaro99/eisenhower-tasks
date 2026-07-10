@@ -332,12 +332,21 @@ async function cronSync(req, res) {
       const endpoint = CRON_SYNC_ENDPOINTS[integration.provider]
       if (!endpoint) continue
       try {
-        await fetch(`${appUrl}/api/integrations/${endpoint}`, {
+        // `requireAuth` no dispatch só exige um Bearer não-vazio — não valida
+        // aqui se é sessão de usuário. A chamada Supabase dentro do handler
+        // (via sb()) é quem decide o acesso pelo claim `role` do JWT, e a
+        // service role key bypassa RLS, apropriado pra um job de sistema
+        // sincronizando em nome de todos os usuários. (Antes usava um header
+        // `X-Cron-Key` que `requireAuth` nunca lê — todo sync falhava com
+        // 401 silenciosamente, mascarado pelo catch abaixo.)
+        const syncRes = await fetch(`${appUrl}/api/integrations/${endpoint}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Cron-Key': process.env.CRON_SECRET || '' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}` },
           body: JSON.stringify({ integration_id: integration.id }),
         })
-        results.push({ id: integration.id, provider: integration.provider, ok: true })
+        const syncData = await syncRes.json()
+        if (!syncRes.ok) throw new Error(syncData.error || `HTTP ${syncRes.status}`)
+        results.push({ id: integration.id, provider: integration.provider, ok: true, synced: syncData.synced })
       } catch (e) {
         results.push({ id: integration.id, provider: integration.provider, error: e.message })
       }

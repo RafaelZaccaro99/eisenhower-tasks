@@ -8,7 +8,7 @@ import { useWorkspace } from '../hooks/useWorkspace'
 // o navegador pra cá (via /api/mcp-auth/authorize) depois de o usuário clicar
 // "Add custom connector" no claude.ai.
 export default function ConnectClaude({ requestId }) {
-  const { user, accessToken, loading: authLoading, signIn, signUp } = useAuth()
+  const { user, accessToken, loading: authLoading, signIn, signUp, requestPasswordReset } = useAuth()
   const ws = useWorkspace(user)
   const [pending, setPending] = useState(null)
   const [chosenWs, setChosenWs] = useState('')
@@ -63,7 +63,7 @@ export default function ConnectClaude({ requestId }) {
   }
 
   if (!user) {
-    return <AuthScreen onSignIn={signIn} onSignUp={signUp} />
+    return <AuthScreen onSignIn={signIn} onSignUp={signUp} onRequestReset={requestPasswordReset} />
   }
 
   return (

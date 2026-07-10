@@ -3,7 +3,11 @@ const { createHmac, randomBytes } = require('crypto')
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY
-const STATE_SECRET = process.env.STATE_SECRET || 'dev-state-secret'
+// Sem fallback: um segredo público e conhecido tornaria o `state` do OAuth
+// outbound forjável (um atacante poderia gravar o próprio token OAuth como
+// se fosse de outro usuário). Falha só no uso (não no require deste módulo,
+// que é compartilhado por endpoints que não fazem OAuth outbound).
+const STATE_SECRET = process.env.STATE_SECRET
 
 async function sb(path, method = 'GET', body, authToken, upsert = false) {
   const headers = {
@@ -79,19 +83,26 @@ async function sbService(path, method = 'GET', body, upsert = false) {
 }
 
 // HMAC-signed state for OAuth CSRF protection
+function requireStateSecret() {
+  if (!STATE_SECRET) throw new Error('STATE_SECRET não configurada — obrigatória para o fluxo OAuth outbound')
+  return STATE_SECRET
+}
+
 function makeState(userId) {
+  const secret = requireStateSecret()
   const nonce = randomBytes(16).toString('hex')
   const payload = Buffer.from(JSON.stringify({ userId, nonce })).toString('base64url')
-  const sig = createHmac('sha256', STATE_SECRET).update(payload).digest('base64url')
+  const sig = createHmac('sha256', secret).update(payload).digest('base64url')
   return `${payload}.${sig}`
 }
 
 function verifyState(state) {
+  const secret = requireStateSecret()
   const dotIdx = (state || '').lastIndexOf('.')
   if (dotIdx === -1) throw new Error('invalid_state')
   const payload = state.slice(0, dotIdx)
   const sig = state.slice(dotIdx + 1)
-  const expected = createHmac('sha256', STATE_SECRET).update(payload).digest('base64url')
+  const expected = createHmac('sha256', secret).update(payload).digest('base64url')
   if (sig !== expected) throw new Error('invalid_state')
   return JSON.parse(Buffer.from(payload, 'base64url').toString())
 }

@@ -1,6 +1,10 @@
 const { createCipheriv, createDecipheriv, randomBytes } = require('crypto')
 
-const KEY_HEX = process.env.ENCRYPTION_KEY || '0'.repeat(64)
+// Sem fallback: uma chave conhecida cifraria tokens OAuth de calendário de
+// forma trivialmente reversível por qualquer um com leitura no banco.
+// Falha alto (throw), não silenciosamente inseguro.
+const KEY_HEX = process.env.ENCRYPTION_KEY
+if (!KEY_HEX) throw new Error('ENCRYPTION_KEY não configurada — obrigatória para cifrar tokens OAuth de calendário')
 const KEY = Buffer.from(KEY_HEX.slice(0, 64), 'hex')
 
 function encrypt(text) {
