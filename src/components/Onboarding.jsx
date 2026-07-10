@@ -3,6 +3,7 @@ import { ChevronRight, ChevronLeft, Check, X } from 'lucide-react'
 
 const STEPS = [
   { id: 'welcome',    title: 'Bem-vindo ao Eisenhower' },
+  { id: 'about',      title: 'Conte sobre você' },
   { id: 'urgency',   title: 'O que é urgente para você?' },
   { id: 'important', title: 'O que é importante para você?' },
   { id: 'delegate',  title: 'O que você delega?' },
@@ -84,6 +85,7 @@ function TagInput({ tags, onChange, suggestions, placeholder }) {
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = useState(0)
   const [data, setData] = useState({
+    businessContext: '',
     urgencyDeadlineDays: 2,
     urgencyTriggers: ['hoje', 'urgente', 'prazo', 'cliente'],
     urgencyContexts: [],
@@ -119,8 +121,8 @@ export default function Onboarding({ onComplete }) {
             <div className="flex flex-col gap-4">
               <h1 className="text-2xl font-semibold text-notion-text">Bem-vindo ao Eisenhower Tasks</h1>
               <p className="text-notion-sub text-sm leading-relaxed">
-                Vamos configurar o <strong>assistente de enquadramento</strong> com base no seu jeito de trabalhar.
-                Responda 3 perguntas rápidas e o sistema vai aprender a sugerir o quadrante certo para cada tarefa.
+                Vamos configurar e treinar o seu <strong>assistente</strong> com base no seu jeito de trabalhar.
+                Responda algumas perguntas rápidas e o sistema vai aprender a sugerir o quadrante certo e a te ajudar no chat com o seu contexto.
               </p>
               <p className="text-xs text-notion-muted">
                 Você pode alterar tudo isso depois em <strong>Configurações</strong>.
@@ -129,6 +131,25 @@ export default function Onboarding({ onComplete }) {
           )}
 
           {step === 1 && (
+            <div className="flex flex-col gap-5">
+              <div>
+                <h2 className="text-lg font-semibold text-notion-text mb-1">{current.title}</h2>
+                <p className="text-xs text-notion-muted">Isso ajuda o assistente de IA a entender seu contexto quando você conversar com ele no chat.</p>
+              </div>
+
+              <div>
+                <label className="label mb-2">Seu cargo, tipo de negócio e como você trabalha (opcional)</label>
+                <textarea
+                  className="input text-sm min-h-[140px] resize-none"
+                  value={data.businessContext}
+                  onChange={e => set('businessContext', e.target.value)}
+                  placeholder="Ex: Sou gestora de uma agência de marketing com 4 pessoas. Atendo 8 clientes fixos, cada um com reunião semanal. Minha maior dor é não deixar prazo de cliente passar."
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
             <div className="flex flex-col gap-5">
               <div>
                 <h2 className="text-lg font-semibold text-notion-text mb-1">{current.title}</h2>
@@ -163,7 +184,7 @@ export default function Onboarding({ onComplete }) {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div className="flex flex-col gap-5">
               <div>
                 <h2 className="text-lg font-semibold text-notion-text mb-1">{current.title}</h2>
@@ -191,7 +212,7 @@ export default function Onboarding({ onComplete }) {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="flex flex-col gap-5">
               <div>
                 <h2 className="text-lg font-semibold text-notion-text mb-1">{current.title}</h2>
@@ -231,15 +252,15 @@ export default function Onboarding({ onComplete }) {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="flex flex-col items-center justify-center gap-4 h-full text-center py-8">
               <div className="w-14 h-14 rounded-full bg-notion-hover flex items-center justify-center">
                 <Check size={28} className="text-notion-text" />
               </div>
               <h2 className="text-xl font-semibold text-notion-text">Configuração concluída</h2>
               <p className="text-sm text-notion-sub max-w-sm leading-relaxed">
-                O assistente vai sugerir o quadrante certo com base nas suas regras.
-                Você pode refinar isso a qualquer momento em <strong>Configurações → Assistente</strong>.
+                O assistente vai sugerir o quadrante certo com base nas suas regras, e o assistente de IA no chat já sabe sobre você.
+                Você pode refinar isso a qualquer momento em <strong>Configurações → Treinamento do Assistente de IA</strong>.
               </p>
             </div>
           )}

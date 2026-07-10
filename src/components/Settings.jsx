@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Zap, RotateCcw, X, ChevronRight, Eye, EyeOff, Bot, Hash } from 'lucide-react'
+import { Zap, RotateCcw, X, ChevronRight, Eye, EyeOff, Bot, Hash, Sparkles } from 'lucide-react'
 import { PROVIDERS } from '../utils/aiClassifier'
 import IntegrationsSettings from './IntegrationsSettings'
 import TeamSettings from './TeamSettings'
@@ -116,6 +116,26 @@ export default function Settings({
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6">
+
+        {/* Treinamento do assistente de IA */}
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles size={14} className="text-notion-sub" />
+            <h3 className="text-xs font-semibold text-notion-sub uppercase tracking-wide">Treinamento do Assistente de IA</h3>
+          </div>
+          <div className="bg-notion-surface rounded-xl px-4 py-4">
+            <label className="label mb-2">Conte pro assistente sobre você e seu trabalho</label>
+            <textarea
+              className="input text-sm min-h-[110px] resize-none"
+              value={local.businessContext ?? ''}
+              onChange={e => set('businessContext', e.target.value)}
+              placeholder="Ex: Sou gestora de uma agência de marketing com 4 pessoas. Atendo 8 clientes fixos, cada um com reunião semanal. Minha maior dor é não deixar prazo de cliente passar."
+            />
+            <p className="text-xs text-notion-muted mt-2">
+              Isso é o que o assistente lê antes de cada conversa no chat — cargo, tipo de negócio, prioridades, como você trabalha. Quanto mais específico, melhor ele prioriza e monta relatórios pra sua realidade. As palavras-chave abaixo alimentam o classificador automático da matriz.
+            </p>
+          </div>
+        </section>
 
         {/* Assistente */}
         <section>
