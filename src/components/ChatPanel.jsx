@@ -64,9 +64,11 @@ function buildSystemPrompt({ tasks, people, clients, agendaOccurrences, metrics,
   ].filter(Boolean).join('\n')
 
   const anamnesisBlock = [
+    anamnesis.businessContext?.trim() ? `- Sobre o usuário e seu trabalho (escrito por ele): ${anamnesis.businessContext.trim()}` : null,
     anamnesis.importanceAreas?.length ? `- Áreas de foco do usuário: ${anamnesis.importanceAreas.join(', ')}` : null,
     anamnesis.urgencyTriggers?.length ? `- Palavras que indicam urgência para o usuário: ${anamnesis.urgencyTriggers.slice(0, 8).join(', ')}` : null,
     anamnesis.importanceTriggers?.length ? `- Palavras que indicam importância: ${anamnesis.importanceTriggers.slice(0, 8).join(', ')}` : null,
+    anamnesis.hasDelegation ? '- O usuário delega tarefas para outras pessoas da equipe.' : null,
   ].filter(Boolean).join('\n')
 
   return `Você é o assistente pessoal de produtividade do usuário, dentro de um gestor de tarefas com Matriz de Eisenhower, agenda e clientes. Hoje é ${today}. Você analisa, cadastra, atualiza, conclui tarefas e gera relatórios.

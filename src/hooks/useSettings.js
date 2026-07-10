@@ -13,6 +13,7 @@ const DEFAULTS = {
   slackBotToken: '',
   onboardingCompleted: false,
   anamnesis: {
+    businessContext: '',
     urgencyDeadlineDays: 2,
     urgencyTriggers: ['hoje', 'urgente', 'agora', 'prazo', 'vence', 'entrega', 'cliente', 'reunião'],
     urgencyContexts: [],

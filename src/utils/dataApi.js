@@ -10,6 +10,7 @@ let _onUnauthorized = null
 let _workspaceId = null
 
 export function setAuthToken(token) { _authToken = token }
+export function getAuthToken() { return _authToken }
 export function setUnauthorizedHandler(fn) { _onUnauthorized = fn }
 export function setWorkspaceId(id) { _workspaceId = id }
 

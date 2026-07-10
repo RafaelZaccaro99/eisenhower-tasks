@@ -7,6 +7,7 @@ const { sb, sbService, requireAuth, getUserId } = require('../_lib')
 
 const APP_URL = process.env.APP_URL || 'http://localhost:5173'
 const SCOPES = 'tasks:read tasks:write agenda:read agenda:write people:read clients:read'
+const DCR_RATE_LIMIT = 5 // registros de cliente por IP por hora
 
 const genToken = (bytes = 32) => randomBytes(bytes).toString('base64url')
 const sha256hex = (s) => createHash('sha256').update(s).digest('hex')
@@ -16,6 +17,34 @@ function openCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+}
+
+function getClientIp(req) {
+  const fwd = req.headers['x-forwarded-for']
+  return fwd ? fwd.split(',')[0].trim() : (req.socket?.remoteAddress || 'unknown')
+}
+
+function currentHourWindow() {
+  const d = new Date()
+  d.setUTCMinutes(0, 0, 0)
+  return d.toISOString()
+}
+
+// Sem Redis/KV disponível — instâncias serverless são efêmeras, então o
+// contador persiste numa tabela do Supabase (dcr_rate_limits), keyed por
+// hash do IP + janela de 1h.
+async function checkDcrRateLimit(req) {
+  const ipHash = sha256hex(getClientIp(req))
+  const windowStart = currentHourWindow()
+  const existing = await sbService(`/dcr_rate_limits?ip_hash=eq.${ipHash}&window_start=eq.${encodeURIComponent(windowStart)}`)
+  const row = existing[0]
+  if (row && row.count >= DCR_RATE_LIMIT) return false
+  if (row) {
+    await sbService(`/dcr_rate_limits?ip_hash=eq.${ipHash}&window_start=eq.${encodeURIComponent(windowStart)}`, 'PATCH', { count: row.count + 1 })
+  } else {
+    await sbService('/dcr_rate_limits', 'POST', { ip_hash: ipHash, window_start: windowStart, count: 1 })
+  }
+  return true
 }
 
 // -- POST /register (RFC 7591 DCR, cliente público) ------------------------
@@ -29,6 +58,15 @@ async function register(req, res) {
   for (const uri of redirectUris) {
     try { new URL(uri) } catch { return res.status(400).json({ error: 'invalid_redirect_uri' }) }
   }
+
+  const allowed = await checkDcrRateLimit(req).catch(() => true) // fail-open: erro no rate limiter nunca bloqueia registro legítimo
+  if (!allowed) {
+    return res.status(429).json({
+      error: 'too_many_requests',
+      error_description: `Limite de ${DCR_RATE_LIMIT} registros de cliente por hora excedido para este IP. Tente novamente mais tarde.`,
+    })
+  }
+
   const clientId = `mcp_${genToken(16)}`
   const record = {
     client_id: clientId,
